@@ -1,0 +1,37 @@
+---
+description: Node/JS package installation must run inside the relevant container via docker compose exec; use yarn only, never npm
+globs: package.json,**/package.json
+alwaysApply: false
+---
+
+# Node/JS Package Installation
+
+**All Node/JavaScript package installation for this project must:**
+
+1. Be run **from inside the relevant Docker container** using `docker compose exec`.
+2. Use **yarn only** — never use `npm install`, `npm add`, or any npm-based install command.
+
+## How to run
+
+Use the **dev** profile and the service that owns the dependency:
+
+- **API / server / shared deps**: `api-dev`
+- **Web / frontend-only deps**: `web-dev`
+
+Examples (PowerShell, from repo root). This repo has a single root `package.json`; run from `/app` inside the container:
+
+```powershell
+# Add dependency (root package.json is at /app in the image)
+docker compose --profile dev exec api-dev sh -c "cd /app && yarn add <package>"
+
+# Add dev dependency
+docker compose --profile dev exec api-dev sh -c "cd /app && yarn add -D <package>"
+```
+
+Use `api-dev` for API/shared deps and `web-dev` for web-only deps; in both cases run `yarn add` from `/app` so the root `package.json` and lockfile are updated.
+
+## Do not
+
+- Run `yarn add` or `yarn install` on the host when Docker dev is the intended environment.
+- Use `npm install`, `npm add`, `npx add`, or any npm-based install.
+- Suggest or use `npm` for adding or installing packages.

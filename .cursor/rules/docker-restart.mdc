@@ -1,0 +1,31 @@
+---
+description: Restart affected Docker containers after changes so the user can verify
+globs: docker-compose.yml,**/Dockerfile,apps/api/**/*.ts,apps/web/**/*.ts,.env*
+alwaysApply: false
+---
+
+# Docker: Restart Affected Containers
+
+After making changes that affect running services, **restart the relevant Docker Compose services** so the user can verify without manual steps.
+
+Use the **dev** profile and the **-dev** service names (`api-dev`, `web-dev`). Do not use the production service names (`api`, `web`) unless the user is running the prod profile.
+
+## When to restart
+
+- **API** (`api-dev`): Changes to `apps/api/` (routes, config, conversation, index), `docker-compose.yml` (api service or env), or `.env` / API config.
+- **Web** (`web-dev`): Changes to `apps/web/` that are baked into the image (e.g. after rebuilding), or `docker-compose.yml` (web service).
+- **Full stack**: Changes to `docker-compose.yml` (volumes, env, service definitions) or root Dockerfiles.
+
+## How to run (PowerShell)
+
+```powershell
+docker compose --profile dev restart api-dev   # API only
+docker compose --profile dev restart web-dev   # Web only
+docker compose --profile dev up -d --build     # Rebuild and recreate if Dockerfiles or compose changed
+```
+
+Prefer `restart` for code/config that is mounted or loaded at runtime; use `up -d --build` when the image content (e.g. app code in the image) changed.
+
+## After applying changes
+
+Mention in your response that the affected container(s) were restarted so the user can verify.
