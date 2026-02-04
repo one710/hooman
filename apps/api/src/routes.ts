@@ -7,7 +7,6 @@ import type { ContextStore } from "./lib/context/index.js";
 import type { HoomanRuntime } from "./lib/hooman-runtime/index.js";
 import type { ColleagueEngine } from "./lib/colleagues/index.js";
 import type { Scheduler } from "./lib/scheduler/index.js";
-import type { MCPClientLayer } from "./lib/mcp-client/index.js";
 import type { MCPConnectionsStore } from "./lib/mcp-connections/store.js";
 import type {
   ColleagueConfig,
@@ -29,7 +28,6 @@ interface AppContext {
     Array<{ role: "user" | "assistant"; text: string }>
   >;
   scheduler: Scheduler;
-  mcpClient: MCPClientLayer;
   pendingChatResults: Map<
     string,
     {
@@ -56,7 +54,6 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     hooman,
     colleagueEngine,
     scheduler,
-    mcpClient,
     pendingChatResults,
     mcpConnectionsStore,
   } = ctx;
@@ -246,11 +243,6 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     res.json({ enabled: killSwitchEnabled });
   });
 
-  // Capability approval: grant via MCP client
-  app.get("/api/capabilities", (_req: Request, res: Response) => {
-    res.json({ capabilities: mcpClient.listGranted() });
-  });
-
   // Available capabilities from configured MCP connections (for Colleagues dropdown)
   app.get(
     "/api/capabilities/available",
@@ -266,26 +258,6 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
       res.json({ capabilities });
     },
   );
-
-  app.post("/api/capabilities/approve", (req: Request, res: Response): void => {
-    const { integration, capability } = req.body ?? {};
-    if (!integration || !capability) {
-      res.status(400).json({ error: "Missing integration or capability." });
-      return;
-    }
-    mcpClient.grantCapability(integration, capability);
-    res.json({ approved: true, capabilities: mcpClient.listGranted() });
-  });
-
-  app.post("/api/capabilities/revoke", (req: Request, res: Response): void => {
-    const { integration, capability } = req.body ?? {};
-    if (!integration || !capability) {
-      res.status(400).json({ error: "Missing integration or capability." });
-      return;
-    }
-    mcpClient.revokeCapability(integration, capability);
-    res.json({ capabilities: mcpClient.listGranted() });
-  });
 
   // MCP connections (Hosted, Streamable HTTP, Stdio)
   app.get("/api/mcp/connections", async (_req: Request, res: Response) => {

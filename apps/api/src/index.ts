@@ -16,7 +16,6 @@ import { LLMGateway } from "./lib/llm-gateway/index.js";
 import { HoomanRuntime } from "./lib/hooman-runtime/index.js";
 import { ColleagueEngine } from "./lib/colleagues/index.js";
 import { Scheduler } from "./lib/scheduler/index.js";
-import { MCPClientLayer } from "./lib/mcp-client/index.js";
 import type { RawDispatchInput } from "./lib/types/index.js";
 import type { HoomanResponsePayload } from "./lib/hooman-runtime/index.js";
 import { getConfig, loadPersisted } from "./config.js";
@@ -222,8 +221,6 @@ const scheduler = new Scheduler(
 await scheduler.load();
 scheduler.start();
 
-const mcpClient = new MCPClientLayer();
-
 hooman.onResponseReceived((payload: HoomanResponsePayload) => {
   if (payload.type === "response") {
     const list = responseStore.get(payload.eventId) ?? [];
@@ -243,7 +240,6 @@ registerRoutes(app, {
   colleagueEngine,
   responseStore,
   scheduler,
-  mcpClient,
   pendingChatResults,
   mcpConnectionsStore,
 });

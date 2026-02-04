@@ -112,18 +112,6 @@ export async function getKillSwitch(): Promise<{ enabled: boolean }> {
   return res.json();
 }
 
-export async function getCapabilities(): Promise<{
-  capabilities: {
-    integrationId: string;
-    capability: string;
-    granted?: boolean;
-  }[];
-}> {
-  const res = await fetch(`${BASE}/api/capabilities`);
-  if (!res.ok) return { capabilities: [] };
-  return res.json();
-}
-
 /** Available capabilities from configured MCP connections (for Colleagues dropdown). */
 export async function getCapabilitiesAvailable(): Promise<{
   capabilities: { integrationId: string; capability: string }[];

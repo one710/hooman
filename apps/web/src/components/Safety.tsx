@@ -1,30 +1,15 @@
 import { useState, useEffect } from "react";
 import { getKillSwitch, setKillSwitch } from "../api";
 
-async function getCapabilities(): Promise<
-  { integrationId: string; capability: string }[]
-> {
-  const res = await fetch("/api/capabilities");
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.capabilities ?? []).filter(
-    (c: { granted?: boolean }) => c.granted !== false,
-  );
-}
-
 export function Safety() {
   const [killSwitch, setKillSwitchState] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [capabilities, setCapabilities] = useState<
-    { integrationId: string; capability: string }[]
-  >([]);
 
   useEffect(() => {
     getKillSwitch().then((r) => {
       setKillSwitchState(r.enabled);
       setLoading(false);
     });
-    getCapabilities().then(setCapabilities);
   }, []);
 
   async function toggleKillSwitch() {
@@ -69,26 +54,6 @@ export function Safety() {
                 ? "Hooman paused — click to resume"
                 : "Hooman active — click to pause"}
             </button>
-          )}
-        </div>
-        <div className="rounded-xl border border-hooman-border bg-hooman-surface p-4">
-          <h3 className="font-medium text-white mb-2">Capability approvals</h3>
-          <p className="text-sm text-hooman-muted mb-3">
-            When Hooman requests access (e.g. send email, Slack), you approve in
-            Chat or here.
-          </p>
-          {capabilities.length > 0 ? (
-            <ul className="text-sm text-zinc-300 space-y-1">
-              {capabilities.map((c, i) => (
-                <li key={i}>
-                  {c.integrationId} → {c.capability}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-hooman-muted">
-              No capabilities approved yet.
-            </p>
           )}
         </div>
       </div>
