@@ -1,10 +1,4 @@
-import { Agent, Runner, run, setDefaultOpenAIKey } from "@openai/agents";
-import type { ColleagueConfig } from "../types/index.js";
-
-const HOOMAN_INSTRUCTIONS = `You are Hooman, an autonomous digital self that operates on behalf of the user.
-Be conversational and human-first. Use memory context when provided to tailor and remember preferences.
-When the user's request fits a specialized colleague you can hand off to, do so. Otherwise respond yourself.
-If you need an external capability (e.g. send email, Slack), say so and ask for approval; never assume.`;
+import { Agent, Runner, run } from "@openai/agents";
 
 /** Simple thread item for building input; we convert to SDK format (content as array) before run(). */
 export type AgentInputItem = { role: "user" | "assistant"; content: string };
@@ -39,31 +33,6 @@ function toProtocolItems(items: AgentInputItem[]): Array<
 }
 
 /**
- * Build the top-level Hooman agent with optional handoffs to colleague agents.
- * When colleagues is empty, returns a single Hooman agent with no handoffs.
- */
-export function createHoomanAgent(
-  colleagues: ColleagueConfig[],
-  options?: { apiKey?: string; model?: string },
-): Agent {
-  if (options?.apiKey) setDefaultOpenAIKey(options.apiKey);
-
-  const colleagueAgents = colleagues.map((p) => {
-    return new Agent({
-      name: p.id,
-      instructions: p.responsibilities?.trim() || p.description,
-      handoffDescription: p.description,
-    });
-  });
-
-  return Agent.create({
-    name: "Hooman",
-    instructions: HOOMAN_INSTRUCTIONS,
-    handoffs: colleagueAgents,
-  });
-}
-
-/**
  * Run the Hooman agent with the given thread and new user message.
  * Injects memoryContext as a leading user message when provided.
  * Returns the final text output, which agent responded (for handoff traceability), and run items.
@@ -91,8 +60,6 @@ export async function runChat(
     targetAgent?: { name: string };
   }>;
 }> {
-  if (options?.apiKey) setDefaultOpenAIKey(options.apiKey);
-
   const input: AgentInputItem[] = [];
   if (options?.memoryContext?.trim()) {
     input.push({

@@ -9,12 +9,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** API package root (apps/api when built). Data lives in <root>/data. */
 const API_ROOT = join(__dirname, "..");
 
-/** Settings UI / persisted config (API key, embedding model, LLM model, web search). */
+/** Settings UI / persisted config (API key, embedding model, LLM model, web search, MCP). */
 export interface PersistedConfig {
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
   OPENAI_EMBEDDING_MODEL: string;
   OPENAI_WEB_SEARCH: boolean;
+  MCP_USE_SERVER_MANAGER: boolean;
 }
 
 /** Full config: persisted + QDRANT_URL and PORT from .env only. */
@@ -28,15 +29,14 @@ const DEFAULTS: PersistedConfig = {
   OPENAI_MODEL: "gpt-5.2",
   OPENAI_EMBEDDING_MODEL: "text-embedding-3-small",
   OPENAI_WEB_SEARCH: false,
+  MCP_USE_SERVER_MANAGER: false,
 };
 
 const ENV_DEFAULTS = {
   PORT: 3000,
 };
 
-let store: PersistedConfig = {
-  ...DEFAULTS,
-};
+let store: PersistedConfig = { ...DEFAULTS };
 
 const CONFIG_PATH = join(API_ROOT, "data", "config.json");
 
@@ -58,6 +58,8 @@ export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
       DEFAULTS.OPENAI_EMBEDDING_MODEL;
   if (patch.OPENAI_WEB_SEARCH !== undefined)
     store.OPENAI_WEB_SEARCH = Boolean(patch.OPENAI_WEB_SEARCH);
+  if (patch.MCP_USE_SERVER_MANAGER !== undefined)
+    store.MCP_USE_SERVER_MANAGER = Boolean(patch.MCP_USE_SERVER_MANAGER);
   persist().catch((err) => debug("persist error: %o", err));
   return { ...store };
 }
@@ -88,6 +90,8 @@ export async function loadPersisted(): Promise<void> {
           DEFAULTS.OPENAI_EMBEDDING_MODEL;
       if (parsed.OPENAI_WEB_SEARCH !== undefined)
         store.OPENAI_WEB_SEARCH = Boolean(parsed.OPENAI_WEB_SEARCH);
+      if (parsed.MCP_USE_SERVER_MANAGER !== undefined)
+        store.MCP_USE_SERVER_MANAGER = Boolean(parsed.MCP_USE_SERVER_MANAGER);
     }
   } catch {
     // no file or invalid

@@ -6,6 +6,7 @@ import { Colleagues } from "./components/Colleagues";
 import { Schedule } from "./components/Schedule";
 import { Audit } from "./components/Audit";
 import { Safety } from "./components/Safety";
+import { Capabilities } from "./components/Capabilities";
 import { Settings } from "./components/Settings";
 import { getChatHistory, clearChatHistory } from "./api";
 import type { View } from "./types";
@@ -19,6 +20,7 @@ const VIEW_LABELS: Record<View, string> = {
   schedule: "Schedule",
   audit: "Audit log",
   safety: "Safety",
+  capabilities: "Capabilities",
   settings: "Settings",
 };
 
@@ -108,6 +110,7 @@ export default function App() {
         {view === "schedule" && <Schedule />}
         {view === "audit" && <Audit />}
         {view === "safety" && <Safety />}
+        {view === "capabilities" && <Capabilities />}
         {view === "settings" && <Settings />}
       </main>
     </div>

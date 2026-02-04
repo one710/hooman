@@ -171,3 +171,49 @@ export interface KillSwitchState {
   reason?: string;
   at?: string;
 }
+
+// MCP connection configs (aligned with OpenAI Agents SDK MCP: Hosted, Streamable HTTP, Stdio)
+export type MCPRequireApproval =
+  | "always"
+  | "never"
+  | Record<string, "always" | "never">;
+
+export interface MCPConnectionHosted {
+  id: string;
+  type: "hosted";
+  /** Server label exposed to the model (e.g. "gitmcp"). */
+  server_label: string;
+  /** Public MCP server URL (required). */
+  server_url: string;
+  /** "always" | "never" or per-tool map. */
+  require_approval: MCPRequireApproval;
+  /** When true, use streaming for hosted MCP results. */
+  streaming?: boolean;
+  created_at?: string;
+}
+
+export interface MCPConnectionStreamableHttp {
+  id: string;
+  type: "streamable_http";
+  name: string;
+  url: string;
+  headers?: Record<string, string>;
+  timeout_seconds?: number;
+  cache_tools_list?: boolean;
+  max_retry_attempts?: number;
+  created_at?: string;
+}
+
+export interface MCPConnectionStdio {
+  id: string;
+  type: "stdio";
+  name: string;
+  command: string;
+  args: string[];
+  created_at?: string;
+}
+
+export type MCPConnection =
+  | MCPConnectionHosted
+  | MCPConnectionStreamableHttp
+  | MCPConnectionStdio;

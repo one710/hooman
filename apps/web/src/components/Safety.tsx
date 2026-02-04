@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getKillSwitch, setKillSwitch, getHealth } from "../api";
+import { getKillSwitch, setKillSwitch } from "../api";
 
 async function getCapabilities(): Promise<
   { integrationId: string; capability: string }[]
@@ -15,10 +15,6 @@ async function getCapabilities(): Promise<
 export function Safety() {
   const [killSwitch, setKillSwitchState] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [health, setHealth] = useState<{
-    status: string;
-    killSwitch?: boolean;
-  } | null>(null);
   const [capabilities, setCapabilities] = useState<
     { integrationId: string; capability: string }[]
   >([]);
@@ -28,7 +24,6 @@ export function Safety() {
       setKillSwitchState(r.enabled);
       setLoading(false);
     });
-    getHealth().then(setHealth);
     getCapabilities().then(setCapabilities);
   }, []);
 
@@ -49,18 +44,10 @@ export function Safety() {
           Safety & control
         </h2>
         <p className="text-xs md:text-sm text-hooman-muted">
-          Global kill switch, capability permissions, audit.
+          Pause Hooman or control what it’s allowed to do.
         </p>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0">
-        {health && (
-          <div className="rounded-xl border border-hooman-border bg-hooman-surface p-4">
-            <p className="text-sm text-hooman-muted">API status</p>
-            <p className="text-white font-medium">
-              {health.status === "ok" ? "Running" : health.status}
-            </p>
-          </div>
-        )}
         <div className="rounded-xl border border-hooman-border bg-hooman-surface p-4">
           <h3 className="font-medium text-white mb-2">Global kill switch</h3>
           <p className="text-sm text-hooman-muted mb-4">

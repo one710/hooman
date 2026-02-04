@@ -4,6 +4,7 @@ export type View =
   | "schedule"
   | "audit"
   | "safety"
+  | "capabilities"
   | "settings";
 
 export interface ChatMessage {
@@ -31,3 +32,42 @@ export interface AuditEntry {
   type: string;
   payload: Record<string, unknown>;
 }
+
+// MCP connection configs (mirror API types)
+export type MCPRequireApproval = "always" | "never";
+
+export interface MCPConnectionHosted {
+  id: string;
+  type: "hosted";
+  server_label: string;
+  server_url: string;
+  require_approval: MCPRequireApproval | Record<string, MCPRequireApproval>;
+  streaming?: boolean;
+  created_at?: string;
+}
+
+export interface MCPConnectionStreamableHttp {
+  id: string;
+  type: "streamable_http";
+  name: string;
+  url: string;
+  headers?: Record<string, string>;
+  timeout_seconds?: number;
+  cache_tools_list?: boolean;
+  max_retry_attempts?: number;
+  created_at?: string;
+}
+
+export interface MCPConnectionStdio {
+  id: string;
+  type: "stdio";
+  name: string;
+  command: string;
+  args: string[];
+  created_at?: string;
+}
+
+export type MCPConnection =
+  | MCPConnectionHosted
+  | MCPConnectionStreamableHttp
+  | MCPConnectionStdio;

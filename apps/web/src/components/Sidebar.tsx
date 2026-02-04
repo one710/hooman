@@ -4,6 +4,7 @@ import {
   Clock,
   ClipboardList,
   Shield,
+  Plug,
   Settings,
   X,
   type LucideIcon,
@@ -23,6 +24,7 @@ const nav: { id: View; label: string; Icon: LucideIcon }[] = [
   { id: "schedule", label: "Schedule", Icon: Clock },
   { id: "audit", label: "Audit log", Icon: ClipboardList },
   { id: "safety", label: "Safety", Icon: Shield },
+  { id: "capabilities", label: "Capabilities", Icon: Plug },
   { id: "settings", label: "Settings", Icon: Settings },
 ];
 

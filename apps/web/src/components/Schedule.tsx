@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useDialog } from "./Dialog";
 import { Button } from "./Button";
 import { Input } from "./Input";
 import { DateTimePicker } from "./DateTimePicker";
+import { Modal } from "./Modal";
 
 interface Task {
   id: string;
@@ -42,6 +43,7 @@ export function Schedule() {
   const dialog = useDialog();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
   const [executeAt, setExecuteAt] = useState("");
   const [intent, setIntent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,13 @@ export function Schedule() {
     return () => clearInterval(t);
   }, []);
 
+  function openAdd() {
+    setError(null);
+    setExecuteAt("");
+    setIntent("");
+    setAddOpen(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!executeAt || !intent) {
@@ -71,6 +80,7 @@ export function Schedule() {
       await createTask(executeAt, intent, {});
       setExecuteAt("");
       setIntent("");
+      setAddOpen(false);
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -95,25 +105,34 @@ export function Schedule() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold text-white">
-          Schedule
-        </h2>
-        <p className="text-xs md:text-sm text-hooman-muted">
-          Future tasks. At execution time Hooman decides and Colleagues execute.
-        </p>
+      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-base md:text-lg font-semibold text-white">
+            Schedule
+          </h2>
+          <p className="text-xs md:text-sm text-hooman-muted truncate">
+            Set tasks for later—Hooman will run them when the time comes.
+          </p>
+        </div>
+        <Button
+          onClick={openAdd}
+          className="self-start sm:self-auto"
+          icon={<Plus className="w-4 h-4" />}
+        >
+          Add task
+        </Button>
       </header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
+      <Modal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add scheduled task"
+      >
         {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+          <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
             {error}
           </div>
         )}
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-xl border border-hooman-border bg-hooman-surface p-4 space-y-3"
-        >
-          <h3 className="font-medium text-white">Add scheduled task</h3>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <DateTimePicker
             label="Date and time"
             value={executeAt}
@@ -126,10 +145,25 @@ export function Schedule() {
             value={intent}
             onChange={(e) => setIntent(e.target.value)}
           />
-          <Button type="submit">Schedule</Button>
+          <div className="flex gap-2 pt-2">
+            <Button type="submit">Schedule</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setAddOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
         </form>
+      </Modal>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
+        {error && !addOpen && (
+          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+            {error}
+          </div>
+        )}
         <div>
-          <h3 className="font-medium text-white mb-2">Upcoming</h3>
           {loading && tasks.length === 0 ? (
             <p className="text-hooman-muted text-sm">Loading…</p>
           ) : (

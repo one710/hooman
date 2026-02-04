@@ -8,7 +8,14 @@ import type { HoomanRuntime } from "./lib/hooman-runtime/index.js";
 import type { ColleagueEngine } from "./lib/colleagues/index.js";
 import type { Scheduler } from "./lib/scheduler/index.js";
 import type { MCPClientLayer } from "./lib/mcp-client/index.js";
-import type { ColleagueConfig } from "./lib/types/index.js";
+import type { MCPConnectionsStore } from "./lib/mcp-connections/store.js";
+import type {
+  ColleagueConfig,
+  MCPConnection,
+  MCPConnectionHosted,
+  MCPConnectionStreamableHttp,
+  MCPConnectionStdio,
+} from "./lib/types/index.js";
 import { randomUUID } from "crypto";
 import { getConfig, updateConfig } from "./config.js";
 
@@ -37,6 +44,7 @@ interface AppContext {
       reject: (reason: unknown) => void;
     }
   >;
+  mcpConnectionsStore: MCPConnectionsStore;
 }
 
 let killSwitchEnabled = false;
@@ -50,6 +58,7 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     scheduler,
     mcpClient,
     pendingChatResults,
+    mcpConnectionsStore,
   } = ctx;
 
   // Health
@@ -57,7 +66,7 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     res.json({ status: "ok", killSwitch: killSwitchEnabled });
   });
 
-  // Configuration (Settings UI: API key, embedding model, LLM model only; QDRANT_URL and PORT are .env-only)
+  // Configuration (Settings UI: API key, embedding model, LLM model, web search, MCP; QDRANT_URL and PORT are .env-only)
   app.get("/api/config", (_req: Request, res: Response) => {
     const c = getConfig();
     res.json({
@@ -65,6 +74,7 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
       OPENAI_MODEL: c.OPENAI_MODEL,
       OPENAI_EMBEDDING_MODEL: c.OPENAI_EMBEDDING_MODEL,
       OPENAI_WEB_SEARCH: c.OPENAI_WEB_SEARCH,
+      MCP_USE_SERVER_MANAGER: c.MCP_USE_SERVER_MANAGER,
     });
   });
 
@@ -81,6 +91,9 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
         | string
         | undefined,
       OPENAI_WEB_SEARCH: patch.OPENAI_WEB_SEARCH as boolean | undefined,
+      MCP_USE_SERVER_MANAGER: patch.MCP_USE_SERVER_MANAGER as
+        | boolean
+        | undefined,
     });
     res.json(updated);
   });
@@ -238,6 +251,22 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     res.json({ capabilities: mcpClient.listGranted() });
   });
 
+  // Available capabilities from configured MCP connections (for Colleagues dropdown)
+  app.get(
+    "/api/capabilities/available",
+    async (_req: Request, res: Response) => {
+      const connections = await mcpConnectionsStore.getAll();
+      const capabilities = connections.map((c) => ({
+        integrationId: c.id,
+        capability:
+          c.type === "hosted"
+            ? c.server_label || c.id
+            : (c as { name?: string }).name || c.id,
+      }));
+      res.json({ capabilities });
+    },
+  );
+
   app.post("/api/capabilities/approve", (req: Request, res: Response): void => {
     const { integration, capability } = req.body ?? {};
     if (!integration || !capability) {
@@ -257,6 +286,107 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
     mcpClient.revokeCapability(integration, capability);
     res.json({ capabilities: mcpClient.listGranted() });
   });
+
+  // MCP connections (Hosted, Streamable HTTP, Stdio)
+  app.get("/api/mcp/connections", async (_req: Request, res: Response) => {
+    const connections = await mcpConnectionsStore.getAll();
+    res.json({ connections });
+  });
+
+  app.post(
+    "/api/mcp/connections",
+    async (req: Request, res: Response): Promise<void> => {
+      const body = req.body as Partial<MCPConnection> & { id?: string };
+      if (!body?.type) {
+        res.status(400).json({ error: "Missing connection type." });
+        return;
+      }
+      const id = body.id?.trim() || randomUUID();
+      const created_at = new Date().toISOString();
+      let conn: MCPConnection;
+      if (body.type === "hosted") {
+        const serverUrl =
+          typeof body.server_url === "string" ? body.server_url.trim() : "";
+        if (!serverUrl) {
+          res
+            .status(400)
+            .json({ error: "Server URL is required for hosted MCP." });
+          return;
+        }
+        const c: MCPConnectionHosted = {
+          id,
+          type: "hosted",
+          server_label: body.server_label ?? "",
+          server_url: serverUrl,
+          require_approval: body.require_approval ?? "never",
+          streaming: body.streaming ?? false,
+          created_at,
+        };
+        conn = c;
+      } else if (body.type === "streamable_http") {
+        const c: MCPConnectionStreamableHttp = {
+          id,
+          type: "streamable_http",
+          name: body.name ?? "",
+          url: body.url ?? "",
+          headers: body.headers,
+          timeout_seconds: body.timeout_seconds,
+          cache_tools_list: body.cache_tools_list ?? true,
+          max_retry_attempts: body.max_retry_attempts,
+          created_at,
+        };
+        conn = c;
+      } else if (body.type === "stdio") {
+        const c: MCPConnectionStdio = {
+          id,
+          type: "stdio",
+          name: body.name ?? "",
+          command: body.command ?? "",
+          args: Array.isArray(body.args) ? body.args : [],
+          created_at,
+        };
+        conn = c;
+      } else {
+        res.status(400).json({
+          error: `Unknown connection type: ${(body as { type?: string }).type}`,
+        });
+        return;
+      }
+      await mcpConnectionsStore.addOrUpdate(conn);
+      res.status(201).json({ connection: conn });
+    },
+  );
+
+  app.patch(
+    "/api/mcp/connections/:id",
+    async (req: Request, res: Response): Promise<void> => {
+      const existing = await mcpConnectionsStore.getById(req.params.id);
+      if (!existing) {
+        res.status(404).json({ error: "MCP connection not found." });
+        return;
+      }
+      const patch = req.body as Partial<MCPConnection>;
+      const merged = {
+        ...existing,
+        ...patch,
+        id: existing.id,
+      } as MCPConnection;
+      await mcpConnectionsStore.addOrUpdate(merged);
+      res.json({ connection: merged });
+    },
+  );
+
+  app.delete(
+    "/api/mcp/connections/:id",
+    async (req: Request, res: Response): Promise<void> => {
+      const ok = await mcpConnectionsStore.remove(req.params.id);
+      if (!ok) {
+        res.status(404).json({ error: "MCP connection not found." });
+        return;
+      }
+      res.status(204).send();
+    },
+  );
 
   // Scheduling
   app.get("/api/schedule", (_req: Request, res: Response) => {

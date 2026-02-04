@@ -8,6 +8,7 @@ export interface AppConfig {
   OPENAI_MODEL: string;
   OPENAI_EMBEDDING_MODEL: string;
   OPENAI_WEB_SEARCH: boolean;
+  MCP_USE_SERVER_MANAGER: boolean;
 }
 
 async function getConfig(): Promise<AppConfig> {
@@ -48,11 +49,17 @@ export function Settings() {
     setSaving(true);
     setMessage(null);
     try {
-      const updated = await saveConfig(form);
+      const updated = await saveConfig({
+        OPENAI_API_KEY: form.OPENAI_API_KEY,
+        OPENAI_MODEL: form.OPENAI_MODEL,
+        OPENAI_EMBEDDING_MODEL: form.OPENAI_EMBEDDING_MODEL,
+        OPENAI_WEB_SEARCH: form.OPENAI_WEB_SEARCH,
+        MCP_USE_SERVER_MANAGER: form.MCP_USE_SERVER_MANAGER,
+      });
       setForm({ ...updated });
       setMessage({
         type: "ok",
-        text: "Settings saved. LLM and memory use these values for new requests.",
+        text: "Settings saved. LLM, memory, and MCP use these values for new requests.",
       });
     } catch (e) {
       setMessage({ type: "err", text: (e as Error).message });
@@ -74,8 +81,7 @@ export function Settings() {
           Settings
         </h2>
         <p className="text-xs md:text-sm text-hooman-muted">
-          API key, LLM model (chat and Mem0), and embedding model (Mem0 only).
-          QDRANT_URL and PORT are set via .env.
+          Your API keys and how Hooman thinks and remembers.
         </p>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
@@ -160,6 +166,26 @@ export function Settings() {
             When enabled, chat uses the Responses API with web search so the
             model can look up current information.
           </p>
+          <div className="pt-4 border-t border-hooman-border">
+            <h3 className="text-sm font-medium text-zinc-300 mb-2">
+              MCP server manager
+            </h3>
+            <Checkbox
+              id="use-mcp-server-manager"
+              label="Use MCP server manager"
+              checked={form.MCP_USE_SERVER_MANAGER ?? false}
+              onChange={(checked) =>
+                setForm((f) =>
+                  f ? { ...f, MCP_USE_SERVER_MANAGER: checked } : f,
+                )
+              }
+            />
+            <p className="text-xs text-hooman-muted mt-1">
+              When enabled, multiple MCP servers are connected via a manager
+              (active_servers, drop_failed_servers, reconnect). When disabled,
+              servers are connected individually.
+            </p>
+          </div>
           <Button type="submit" disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>

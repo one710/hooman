@@ -121,7 +121,7 @@ export function Chat({
             Chat with Hooman
           </h2>
           <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Talk to your autonomous digital self.
+            Have a conversation with Hooman and get things done.
           </p>
         </div>
         {onClearChat && (

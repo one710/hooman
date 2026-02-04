@@ -25,7 +25,9 @@ import { initChatHistory } from "./lib/chat-history/index.js";
 import { createContext } from "./lib/context/index.js";
 import { initColleagueStore } from "./lib/colleagues/store.js";
 import { initScheduleStore } from "./lib/schedule-store/index.js";
-import { createHoomanAgent, runChat } from "./lib/agents-runner/index.js";
+import { initMCPConnectionsStore } from "./lib/mcp-connections/store.js";
+import { runChat } from "./lib/agents-runner/index.js";
+import { createHoomanAgentWithMcp } from "./lib/agents-runner/mcp-for-agents.js";
 
 const CHAT_THREAD_LIMIT = 30;
 
@@ -62,6 +64,9 @@ await colleagueEngine.load();
 
 const scheduleStore = await initScheduleStore(mongoUri);
 debug("Schedules using MongoDB");
+
+const mcpConnectionsStore = await initMCPConnectionsStore(mongoUri);
+debug("MCP connections using MongoDB");
 
 eventRouter.register(async (event) => {
   if (
@@ -131,54 +136,64 @@ eventRouter.register(async (event) => {
         ? memories.map((m) => `- ${m.memory}`).join("\n")
         : "";
     const colleagues = colleagueEngine.getAll();
-    const agent = createHoomanAgent(colleagues, {
-      apiKey: config.OPENAI_API_KEY || undefined,
-      model: config.OPENAI_MODEL,
-    });
-    const { finalOutput, lastAgentName, newItems } = await runChat(
-      agent,
-      thread,
-      text,
+    const connections = await mcpConnectionsStore.getAll();
+    const { agent, closeMcp } = await createHoomanAgentWithMcp(
+      colleagues,
+      connections,
       {
-        memoryContext,
         apiKey: config.OPENAI_API_KEY || undefined,
-        model: config.OPENAI_MODEL || undefined,
+        model: config.OPENAI_MODEL,
       },
     );
-    assistantText =
-      finalOutput?.trim() ||
-      "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
-    const handoffs = (newItems ?? []).filter(
-      (i) => i.type === "handoff_call_item" || i.type === "handoff_output_item",
-    );
-    hooman.appendAuditEntry({
-      type: "agent_run",
-      payload: {
-        userInput: text,
-        response: assistantText,
-        lastAgentName: lastAgentName ?? "Hooman",
-        handoffs: handoffs.map((h) => ({
-          type: h.type,
-          from: h.agent?.name ?? h.sourceAgent?.name,
-          to: h.targetAgent?.name,
-        })),
-      },
-    });
-    await eventRouter.dispatch({
-      source: "api",
-      type: "chat.turn_completed",
-      payload: { userId, userText: text, assistantText },
-    });
-    if (pending) {
-      pending.resolve({
-        eventId: event.id,
-        message: {
-          role: "assistant",
-          text: assistantText,
-          lastAgentName: lastAgentName ?? undefined,
+    try {
+      const { finalOutput, lastAgentName, newItems } = await runChat(
+        agent,
+        thread,
+        text,
+        {
+          memoryContext,
+          apiKey: config.OPENAI_API_KEY || undefined,
+          model: config.OPENAI_MODEL || undefined,
+        },
+      );
+      assistantText =
+        finalOutput?.trim() ||
+        "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
+      const handoffs = (newItems ?? []).filter(
+        (i) =>
+          i.type === "handoff_call_item" || i.type === "handoff_output_item",
+      );
+      hooman.appendAuditEntry({
+        type: "agent_run",
+        payload: {
+          userInput: text,
+          response: assistantText,
+          lastAgentName: lastAgentName ?? "Hooman",
+          handoffs: handoffs.map((h) => ({
+            type: h.type,
+            from: h.agent?.name ?? h.sourceAgent?.name,
+            to: h.targetAgent?.name,
+          })),
         },
       });
-      pendingChatResults.delete(event.id);
+      await eventRouter.dispatch({
+        source: "api",
+        type: "chat.turn_completed",
+        payload: { userId, userText: text, assistantText },
+      });
+      if (pending) {
+        pending.resolve({
+          eventId: event.id,
+          message: {
+            role: "assistant",
+            text: assistantText,
+            lastAgentName: lastAgentName ?? undefined,
+          },
+        });
+        pendingChatResults.delete(event.id);
+      }
+    } finally {
+      await closeMcp();
     }
   } catch (err) {
     const msg = (err as Error).message;
@@ -230,6 +245,7 @@ registerRoutes(app, {
   scheduler,
   mcpClient,
   pendingChatResults,
+  mcpConnectionsStore,
 });
 
 const PORT = getConfig().PORT;

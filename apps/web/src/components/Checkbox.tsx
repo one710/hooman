@@ -18,7 +18,7 @@ export function Checkbox({
   return (
     <label
       htmlFor={id}
-      className={`inline-flex items-center gap-2 cursor-pointer select-none ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+      className={`flex items-center gap-2 cursor-pointer select-none w-fit ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <input
         type="checkbox"
@@ -29,14 +29,14 @@ export function Checkbox({
         className="sr-only peer"
       />
       <span
-        className={`inline-flex items-center justify-center w-5 h-5 rounded border shrink-0 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-hooman-accent/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-hooman-bg ${
+        className={`flex items-center justify-center w-5 h-5 rounded border shrink-0 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-hooman-accent/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-hooman-bg [&>svg]:block ${
           checked
             ? "bg-hooman-accent border-hooman-accent text-white"
             : "bg-hooman-surface border-hooman-border"
         }`}
         aria-hidden
       >
-        {checked && <Check className="w-3 h-3 stroke-[2.5]" />}
+        {checked ? <Check className="w-3 h-3 shrink-0 stroke-[2.5]" /> : null}
       </span>
       {label != null && (
         <span className="text-sm font-medium text-zinc-300">{label}</span>

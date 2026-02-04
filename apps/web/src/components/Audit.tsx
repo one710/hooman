@@ -482,8 +482,7 @@ export function Audit() {
           Audit log
         </h2>
         <p className="text-xs md:text-sm text-hooman-muted">
-          Decisions, responses, and capability requests. In-memory; resets on
-          restart.
+          See what Hooman did and why.
         </p>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">

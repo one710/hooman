@@ -112,6 +112,27 @@ export async function getKillSwitch(): Promise<{ enabled: boolean }> {
   return res.json();
 }
 
+export async function getCapabilities(): Promise<{
+  capabilities: {
+    integrationId: string;
+    capability: string;
+    granted?: boolean;
+  }[];
+}> {
+  const res = await fetch(`${BASE}/api/capabilities`);
+  if (!res.ok) return { capabilities: [] };
+  return res.json();
+}
+
+/** Available capabilities from configured MCP connections (for Colleagues dropdown). */
+export async function getCapabilitiesAvailable(): Promise<{
+  capabilities: { integrationId: string; capability: string }[];
+}> {
+  const res = await fetch(`${BASE}/api/capabilities/available`);
+  if (!res.ok) return { capabilities: [] };
+  return res.json();
+}
+
 export async function setKillSwitch(
   enabled: boolean,
 ): Promise<{ enabled: boolean }> {
@@ -162,5 +183,46 @@ export async function createScheduledTask(
 
 export async function cancelScheduledTask(id: string): Promise<void> {
   const res = await fetch(`${BASE}/api/schedule/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// MCP connections (Hosted, Streamable HTTP, Stdio)
+export async function getMCPConnections(): Promise<{
+  connections: import("./types").MCPConnection[];
+}> {
+  const res = await fetch(`${BASE}/api/mcp/connections`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createMCPConnection(
+  connection: import("./types").MCPConnection,
+): Promise<{ connection: import("./types").MCPConnection }> {
+  const res = await fetch(`${BASE}/api/mcp/connections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(connection),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateMCPConnection(
+  id: string,
+  patch: Partial<import("./types").MCPConnection>,
+): Promise<{ connection: import("./types").MCPConnection }> {
+  const res = await fetch(`${BASE}/api/mcp/connections/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteMCPConnection(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/mcp/connections/${id}`, {
+    method: "DELETE",
+  });
   if (!res.ok) throw new Error(await res.text());
 }
