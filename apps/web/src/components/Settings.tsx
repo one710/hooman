@@ -9,6 +9,7 @@ export interface AppConfig {
   OPENAI_EMBEDDING_MODEL: string;
   OPENAI_WEB_SEARCH: boolean;
   MCP_USE_SERVER_MANAGER: boolean;
+  OPENAI_TRANSCRIPTION_MODEL: string;
 }
 
 async function getConfig(): Promise<AppConfig> {
@@ -55,6 +56,7 @@ export function Settings() {
         OPENAI_EMBEDDING_MODEL: form.OPENAI_EMBEDDING_MODEL,
         OPENAI_WEB_SEARCH: form.OPENAI_WEB_SEARCH,
         MCP_USE_SERVER_MANAGER: form.MCP_USE_SERVER_MANAGER,
+        OPENAI_TRANSCRIPTION_MODEL: form.OPENAI_TRANSCRIPTION_MODEL,
       });
       setForm({ ...updated });
       setMessage({
@@ -152,6 +154,26 @@ export function Settings() {
             <p className="text-xs text-hooman-muted mt-1">
               Used for Mem0 embeddings only (e.g. text-embedding-3-small,
               text-embedding-3-large).
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">
+              OPENAI_TRANSCRIPTION_MODEL (voice input)
+            </label>
+            <Input
+              type="text"
+              value={form.OPENAI_TRANSCRIPTION_MODEL}
+              onChange={(e) =>
+                setForm((f) =>
+                  f ? { ...f, OPENAI_TRANSCRIPTION_MODEL: e.target.value } : f,
+                )
+              }
+              placeholder="gpt-4o-transcribe"
+              className="bg-hooman-surface focus:ring-offset-hooman-surface"
+            />
+            <p className="text-xs text-hooman-muted mt-1">
+              Realtime transcription for the speak button (e.g.
+              gpt-4o-transcribe, gpt-4o-mini-transcribe, whisper-1).
             </p>
           </div>
           <Checkbox

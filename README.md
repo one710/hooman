@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/web/public/favicon.svg" alt="Hooman" width="80" />
+<img src=".github/logo.svg" alt="Hooman" width="80" />
 
 # Hooman
 
@@ -9,6 +9,10 @@
 Build a team of AI colleagues—each with their own capabilities and skills—and talk only to **Hooman**. Hooman is the concierge: they remember context, decide when to handle something themselves or hand off to the right colleague, and keep you in control with approvals and a full audit trail.
 
 </div>
+
+<p align="center">
+  <img src=".github/screenshot.png" alt="Hooman app screenshot" width="800" />
+</p>
 
 > ⚠️ **Experimental / work in progress.** This project is not production-ready. Use with caution and only in a properly sandboxed environment.
 
@@ -41,9 +45,11 @@ You chat with Hooman; Hooman uses memory, may call a colleague, and responds. Sc
 
 **Prerequisites:** Node.js ≥ 20, Yarn, Docker & Docker Compose (for MongoDB and Qdrant).
 
-For general usage, run the **production** stack (after cloning the repo):
+Clone the repo, then run the **production** stack:
 
 ```bash
+git clone https://github.com/vaibhavpandeyvpz/hooman.git
+cd hooman
 docker compose --profile prod up
 ```
 

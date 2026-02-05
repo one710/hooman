@@ -9,13 +9,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** API package root (apps/api when built). Data lives in <root>/data. */
 const API_ROOT = join(__dirname, "..");
 
-/** Settings UI / persisted config (API key, embedding model, LLM model, web search, MCP). */
+/** Settings UI / persisted config (API key, embedding model, LLM model, web search, MCP, transcription). */
 export interface PersistedConfig {
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
   OPENAI_EMBEDDING_MODEL: string;
   OPENAI_WEB_SEARCH: boolean;
   MCP_USE_SERVER_MANAGER: boolean;
+  OPENAI_TRANSCRIPTION_MODEL: string;
 }
 
 /** Full config: persisted + QDRANT_URL and PORT from .env only. */
@@ -30,6 +31,7 @@ const DEFAULTS: PersistedConfig = {
   OPENAI_EMBEDDING_MODEL: "text-embedding-3-small",
   OPENAI_WEB_SEARCH: false,
   MCP_USE_SERVER_MANAGER: false,
+  OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-transcribe",
 };
 
 const ENV_DEFAULTS = {
@@ -60,6 +62,10 @@ export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
     store.OPENAI_WEB_SEARCH = Boolean(patch.OPENAI_WEB_SEARCH);
   if (patch.MCP_USE_SERVER_MANAGER !== undefined)
     store.MCP_USE_SERVER_MANAGER = Boolean(patch.MCP_USE_SERVER_MANAGER);
+  if (patch.OPENAI_TRANSCRIPTION_MODEL !== undefined)
+    store.OPENAI_TRANSCRIPTION_MODEL =
+      String(patch.OPENAI_TRANSCRIPTION_MODEL).trim() ||
+      DEFAULTS.OPENAI_TRANSCRIPTION_MODEL;
   persist().catch((err) => debug("persist error: %o", err));
   return { ...store };
 }
@@ -92,6 +98,10 @@ export async function loadPersisted(): Promise<void> {
         store.OPENAI_WEB_SEARCH = Boolean(parsed.OPENAI_WEB_SEARCH);
       if (parsed.MCP_USE_SERVER_MANAGER !== undefined)
         store.MCP_USE_SERVER_MANAGER = Boolean(parsed.MCP_USE_SERVER_MANAGER);
+      if (parsed.OPENAI_TRANSCRIPTION_MODEL !== undefined)
+        store.OPENAI_TRANSCRIPTION_MODEL =
+          String(parsed.OPENAI_TRANSCRIPTION_MODEL).trim() ||
+          DEFAULTS.OPENAI_TRANSCRIPTION_MODEL;
     }
   } catch {
     // no file or invalid

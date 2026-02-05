@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Background: app surface (hooman.surface) -->
+  <rect width="24" height="24" rx="6" fill="#18181c"/>
+  <!-- User: Lucide user icon paths (head filled + shoulders) in accent -->
+  <circle cx="12" cy="7" r="4" fill="#a78bfa" stroke="none"/>
+  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" stroke="#a78bfa" fill="none"/>
+  <!-- Sparkle: centered on face (12,7), Lucide sparkles star scaled -->
+  <g transform="translate(9,4) scale(0.25)">
+    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" fill="#34d399"/>
+  </g>
+</svg>

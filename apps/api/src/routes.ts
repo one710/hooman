@@ -89,6 +89,7 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
       OPENAI_EMBEDDING_MODEL: c.OPENAI_EMBEDDING_MODEL,
       OPENAI_WEB_SEARCH: c.OPENAI_WEB_SEARCH,
       MCP_USE_SERVER_MANAGER: c.MCP_USE_SERVER_MANAGER,
+      OPENAI_TRANSCRIPTION_MODEL: c.OPENAI_TRANSCRIPTION_MODEL,
     });
   });
 
@@ -108,9 +109,80 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
       MCP_USE_SERVER_MANAGER: patch.MCP_USE_SERVER_MANAGER as
         | boolean
         | undefined,
+      OPENAI_TRANSCRIPTION_MODEL: patch.OPENAI_TRANSCRIPTION_MODEL as
+        | string
+        | undefined,
     });
     res.json(updated);
   });
+
+  // Ephemeral client secret for Realtime API transcription (voice input in chat)
+  app.post(
+    "/api/realtime/client-secret",
+    async (req: Request, res: Response) => {
+      const config = getConfig();
+      const apiKey = config.OPENAI_API_KEY?.trim();
+      if (!apiKey) {
+        res.status(400).json({
+          error: "OPENAI_API_KEY not configured. Set it in Settings.",
+        });
+        return;
+      }
+      const model =
+        (req.body as { model?: string })?.model ??
+        config.OPENAI_TRANSCRIPTION_MODEL;
+      try {
+        const response = await fetch(
+          "https://api.openai.com/v1/realtime/client_secrets",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              expires_after: { anchor: "created_at", seconds: 300 },
+              session: {
+                type: "transcription",
+                audio: {
+                  input: {
+                    format: { type: "audio/pcm", rate: 24000 },
+                    noise_reduction: { type: "near_field" },
+                    transcription: {
+                      model: model || "gpt-4o-transcribe",
+                      prompt: "",
+                      language: "en",
+                    },
+                    turn_detection: {
+                      type: "server_vad",
+                      threshold: 0.5,
+                      prefix_padding_ms: 300,
+                      silence_duration_ms: 500,
+                    },
+                  },
+                },
+              },
+            }),
+          },
+        );
+        if (!response.ok) {
+          const err = await response.text();
+          debug("realtime client_secrets error: %s", err);
+          res
+            .status(response.status)
+            .json({ error: err || "Failed to create client secret." });
+          return;
+        }
+        const data = (await response.json()) as { value: string };
+        res.json({ value: data.value });
+      } catch (err) {
+        debug("realtime client-secret error: %o", err);
+        res
+          .status(500)
+          .json({ error: "Failed to create transcription session." });
+      }
+    },
+  );
 
   // Chat history (context reads from MongoDB when set, else Mem0); enriches messages with attachment meta for UI
   app.get("/api/chat/history", async (req: Request, res: Response) => {

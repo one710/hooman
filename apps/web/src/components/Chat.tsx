@@ -9,12 +9,15 @@ import {
   Paperclip,
   FileText,
   Plus,
+  Mic,
+  Check,
 } from "lucide-react";
 import type { ChatMessage } from "../types";
 import {
   sendMessage,
   uploadAttachments,
   getAttachmentUrl,
+  getRealtimeClientSecret,
   type ChatAttachmentMeta,
 } from "../api";
 import { useDialog } from "./Dialog";
@@ -102,6 +105,11 @@ export function Chat({
     }>
   >([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceSegment, setVoiceSegment] = useState(""); // in-progress from deltas; cleared on completed
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceConnecting, setVoiceConnecting] = useState(false);
   const queueRef = useRef<
     Array<{
       text: string;
@@ -109,8 +117,12 @@ export function Chat({
       attachment_metas?: ChatAttachmentMeta[];
     }>
   >([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const pendingVoiceRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const voicePcRef = useRef<RTCPeerConnection | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const list = Array.from(files).filter(
@@ -156,9 +168,20 @@ export function Chat({
     setAttachments((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const endVoiceSession = useCallback(() => {
+    voiceStreamRef.current?.getTracks().forEach((t) => t.stop());
+    voiceStreamRef.current = null;
+    voicePcRef.current?.close();
+    voicePcRef.current = null;
+  }, []);
+
+  const cancelVoice = useCallback(() => {
+    endVoiceSession();
+    setVoiceActive(false);
+    setVoiceTranscript("");
+    setVoiceSegment("");
+    setVoiceError(null);
+  }, [endVoiceSession]);
 
   const sendOne = useCallback(
     async (text: string, attachmentIds?: string[]) => {
@@ -208,9 +231,102 @@ export function Chat({
     [setMessages],
   );
 
+  const confirmVoice = useCallback(() => {
+    const full = [voiceTranscript, voiceSegment]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    endVoiceSession();
+    setVoiceActive(false);
+    setVoiceTranscript("");
+    setVoiceSegment("");
+    setVoiceError(null);
+    if (!full) return;
+    setInput(full);
+    pendingVoiceRef.current = full;
+    formRef.current?.requestSubmit();
+  }, [voiceTranscript, voiceSegment, endVoiceSession]);
+
+  const startVoiceSession = useCallback(async () => {
+    setVoiceError(null);
+    setVoiceTranscript("");
+    setVoiceConnecting(true);
+    try {
+      const { value: ephemeralKey } = await getRealtimeClientSecret();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      const pc = new RTCPeerConnection();
+      voicePcRef.current = pc;
+      const dc = pc.createDataChannel("oai-events");
+      pc.addTrack(stream.getTracks()[0], stream);
+      dc.addEventListener("message", (e) => {
+        try {
+          const event = JSON.parse(e.data) as {
+            type?: string;
+            delta?: string;
+            transcript?: string;
+          };
+          // Deltas stream in-progress text; completed is the final for that turn (don't append both to avoid duplication)
+          if (
+            event.type ===
+              "conversation.item.input_audio_transcription.delta" &&
+            event.delta
+          )
+            setVoiceSegment((prev) => prev + event.delta);
+          if (
+            event.type ===
+              "conversation.item.input_audio_transcription.completed" &&
+            event.transcript != null
+          ) {
+            const final = String(event.transcript).trim();
+            if (final)
+              setVoiceTranscript((prev) => (prev ? `${prev} ${final}` : final));
+            setVoiceSegment("");
+          }
+        } catch {
+          // ignore parse errors
+        }
+      });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const sdpResponse = await fetch(
+        "https://api.openai.com/v1/realtime/calls",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${ephemeralKey}`,
+            "Content-Type": "application/sdp",
+          },
+          body: offer.sdp ?? "",
+        },
+      );
+      if (!sdpResponse.ok) {
+        const err = await sdpResponse.text();
+        throw new Error(err || "Realtime session failed");
+      }
+      const answerSdp = await sdpResponse.text();
+      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+      setVoiceActive(true);
+    } catch (err) {
+      setVoiceError((err as Error).message || "Could not start voice input");
+      endVoiceSession();
+    } finally {
+      setVoiceConnecting(false);
+    }
+  }, [endVoiceSession]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    return () => endVoiceSession();
+  }, [endVoiceSession]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const text = input.trim();
+    const text = pendingVoiceRef.current ?? input.trim();
+    if (pendingVoiceRef.current) pendingVoiceRef.current = null;
     const ready = attachments.filter((a) => !a.uploading);
     if (!text && ready.length === 0) return;
     if (attachments.some((a) => a.uploading)) return;
@@ -394,6 +510,7 @@ export function Chat({
         <div ref={bottomRef} />
       </div>
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         onDragOver={(e) => {
           e.preventDefault();
@@ -411,6 +528,41 @@ export function Chat({
         }}
         className="p-3 md:p-4 border-t border-hooman-border shrink-0 rounded-lg transition-shadow"
       >
+        {voiceError && (
+          <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
+            {voiceError}
+          </div>
+        )}
+        {voiceActive && (
+          <div className="mb-3 flex items-center gap-2 rounded-xl bg-hooman-surface border border-hooman-border px-3 py-2.5">
+            <Mic className="w-4 h-4 shrink-0 text-hooman-muted" aria-hidden />
+            <span className="flex-1 min-w-0 truncate text-sm text-zinc-200">
+              {[voiceTranscript, voiceSegment].filter(Boolean).join(" ") || (
+                <span className="text-hooman-muted">Listening…</span>
+              )}
+            </span>
+            <Button
+              variant="danger"
+              iconOnly
+              size="icon"
+              icon={<X className="w-4 h-4" />}
+              onClick={cancelVoice}
+              title="Cancel"
+              aria-label="Cancel"
+              className="shrink-0"
+            />
+            <Button
+              variant="success"
+              iconOnly
+              size="icon"
+              icon={<Check className="w-4 h-4" />}
+              onClick={confirmVoice}
+              title="Use as prompt"
+              aria-label="Use as prompt"
+              className="shrink-0"
+            />
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="mb-3 pb-3 border-b border-hooman-border/50">
             <p className="flex items-center gap-2 text-xs text-hooman-muted mb-2">
@@ -529,7 +681,7 @@ export function Chat({
                 }
               }}
               placeholder="Type a message or drag & drop / paste files…"
-              className="w-full rounded-xl bg-hooman-surface border border-hooman-border pl-11 pr-3 md:pl-12 md:pr-4 py-2.5 md:py-3 text-sm md:text-base text-zinc-200 placeholder:text-hooman-muted focus:outline-none focus:ring-2 focus:ring-hooman-accent/50"
+              className="w-full rounded-xl bg-hooman-surface border border-hooman-border pl-11 pr-11 md:pl-12 md:pr-12 py-2.5 md:py-3 text-sm md:text-base text-zinc-200 placeholder:text-hooman-muted focus:outline-none focus:ring-2 focus:ring-hooman-accent/50"
             />
             <button
               type="button"
@@ -540,6 +692,23 @@ export function Chat({
               className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center bg-hooman-surface text-hooman-muted hover:text-zinc-200 hover:bg-hooman-surface/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={startVoiceSession}
+              disabled={voiceConnecting || voiceActive}
+              title="Speak (voice input)"
+              aria-label="Speak"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center bg-hooman-surface text-hooman-muted hover:text-zinc-200 hover:bg-hooman-surface/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {voiceConnecting ? (
+                <Loader2
+                  className="w-4 h-4 md:w-5 md:h-5 shrink-0 animate-spin"
+                  aria-hidden
+                />
+              ) : (
+                <Mic className="w-4 h-4 md:w-5 md:h-5 shrink-0" aria-hidden />
+              )}
             </button>
           </div>
           <button

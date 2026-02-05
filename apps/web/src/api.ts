@@ -88,6 +88,20 @@ export function getAttachmentUrl(id: string): string {
   return `${BASE}/api/chat/attachments/${encodeURIComponent(id)}`;
 }
 
+/** Ephemeral client secret for Realtime API transcription (voice input). */
+export async function getRealtimeClientSecret(model?: string): Promise<{
+  value: string;
+}> {
+  const res = await fetch(`${BASE}/api/realtime/client-secret`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(model != null ? { model } : {}),
+  });
+  const body = await res.text();
+  if (!res.ok) throw new Error(apiError(res, body));
+  return JSON.parse(body) as { value: string };
+}
+
 export async function sendMessage(
   text: string,
   attachment_ids?: string[],
