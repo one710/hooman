@@ -5,8 +5,11 @@ import {
   connectMcpServers,
   hostedMcpTool,
   setDefaultOpenAIKey,
+  tool,
 } from "@openai/agents";
 import type { MCPServer } from "@openai/agents";
+import { listSkillsFromFs, getSkillContent } from "../skills-cli/index.js";
+import type { SkillEntry } from "../skills-cli/index.js";
 import type { ColleagueConfig } from "../types/index.js";
 import type {
   MCPConnection,
@@ -19,6 +22,37 @@ const HOOMAN_INSTRUCTIONS = `You are Hooman, an autonomous digital self that ope
 Be conversational and human-first. Use memory context when provided to tailor and remember preferences.
 When the user's request fits a specialized colleague you can hand off to, do so. Otherwise respond yourself.
 If you need an external capability (e.g. send email, Slack), say so and ask for approval; never assume.`;
+
+/**
+ * Universal tool attached to every colleague: read full SKILL.md content by skill id (Level 2 loading).
+ * Use when the colleague needs to follow a skill's full instructions.
+ */
+const readSkillTool = tool({
+  name: "read_skill",
+  description:
+    "Read the full instructions (SKILL.md) for an installed skill by its id. Use when you need to follow a skill's procedures. Pass the skill_id (e.g. pptx, pdf, docx) from the available skills list.",
+  parameters: {
+    type: "object" as const,
+    properties: {
+      skill_id: {
+        type: "string" as const,
+        description: "The skill id (directory name, e.g. pptx, pdf, docx)",
+      },
+    },
+    required: ["skill_id"] as const,
+    additionalProperties: true as const,
+  },
+  strict: false as const,
+  execute: async (input: unknown) => {
+    const skillId =
+      typeof (input as { skill_id?: string })?.skill_id === "string"
+        ? (input as { skill_id: string }).skill_id.trim()
+        : "";
+    if (!skillId) return "Error: skill_id is required.";
+    const content = await getSkillContent(skillId);
+    return content ?? "Skill not found.";
+  },
+});
 
 /** allowed_connections are connection IDs. */
 function getConnectionIdsFromAllowedCapabilities(
@@ -126,9 +160,29 @@ function buildMcpFromConnections(connections: MCPConnection[]): {
 }
 
 /**
+ * Build Level 1 skill metadata text for agent instructions (name + description per skill).
+ * Mimics Claude's "metadata always loaded" so the agent knows which skills exist and when to use them.
+ */
+function buildSkillsMetadataSection(
+  skillIds: string[],
+  skillsById: Map<string, SkillEntry>,
+): string {
+  if (skillIds.length === 0) return "";
+  const lines: string[] = [];
+  for (const id of skillIds) {
+    const skill = skillsById.get(id);
+    if (!skill) continue;
+    const desc = skill.description?.trim() || "No description.";
+    lines.push(`- **${skill.name}**: ${desc}`);
+  }
+  if (lines.length === 0) return "";
+  return `\n\nAvailable skills (use when relevant):\n${lines.join("\n")}`;
+}
+
+/**
  * Create the Hooman agent with colleague handoffs, attaching MCP servers and tools
- * per colleague based on their allowed_connections. Connects MCP servers before
- * building the agent. Call closeMcp() after run to close servers.
+ * per colleague based on their allowed_connections, and skill metadata (Level 1) from
+ * their allowed_skills. Connects MCP servers before building the agent. Call closeMcp() after run to close servers.
  */
 export async function createHoomanAgentWithMcp(
   colleagues: ColleagueConfig[],
@@ -140,8 +194,17 @@ export async function createHoomanAgentWithMcp(
 }> {
   if (options?.apiKey) setDefaultOpenAIKey(options.apiKey);
 
-  const { servers, connectionIdToServer, connectionIdToHostedTool } =
-    buildMcpFromConnections(connections);
+  const [
+    allSkills,
+    { servers, connectionIdToServer, connectionIdToHostedTool },
+  ] = await Promise.all([
+    listSkillsFromFs(),
+    Promise.resolve(buildMcpFromConnections(connections)),
+  ]);
+
+  const skillsById = new Map<string, SkillEntry>(
+    allSkills.map((s) => [s.id, s]),
+  );
 
   const mcpServersWrapper =
     servers.length > 0
@@ -164,12 +227,17 @@ export async function createHoomanAgentWithMcp(
       if (tool) colleagueTools.push(tool);
     }
 
+    const baseInstructions = p.responsibilities?.trim() || p.description;
+    const skillIds = p.allowed_skills ?? [];
+    const skillsSection = buildSkillsMetadataSection(skillIds, skillsById);
+    const instructions = baseInstructions + skillsSection;
+
     return new Agent({
       name: p.id,
-      instructions: p.responsibilities?.trim() || p.description,
+      instructions,
       handoffDescription: p.description,
       mcpServers: colleagueServers,
-      tools: colleagueTools,
+      tools: [readSkillTool, ...colleagueTools],
     });
   });
 
