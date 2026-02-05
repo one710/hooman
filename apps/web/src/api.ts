@@ -214,3 +214,64 @@ export async function deleteMCPConnection(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error(await res.text());
 }
+
+// Skills (list from ~/.agents; add/remove via npx skills CLI)
+export interface SkillsListResponse {
+  output?: string;
+  error?: string;
+  code?: number | null;
+}
+
+export interface SkillEntry {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface SkillsListApiResponse {
+  skills: SkillEntry[];
+  error?: string;
+}
+
+export async function getSkillsList(): Promise<SkillsListApiResponse> {
+  const res = await fetch(`${BASE}/api/skills/list`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getSkillContent(skillId: string): Promise<{
+  content: string;
+}> {
+  const res = await fetch(
+    `${BASE}/api/skills/${encodeURIComponent(skillId)}/content`,
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function addSkillsPackage(options: {
+  package: string;
+  global?: boolean;
+  skills?: string[];
+}): Promise<SkillsListResponse> {
+  const res = await fetch(`${BASE}/api/skills/add`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function removeSkillsPackage(
+  skills: string[],
+  global = false,
+): Promise<SkillsListResponse> {
+  const res = await fetch(`${BASE}/api/skills/remove`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skills, global }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

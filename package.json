@@ -29,6 +29,7 @@
     "debug": "^4.4.3",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "gray-matter": "^4.0.3",
     "groq-sdk": "^0.37.0",
     "lucide-react": "^0.563.0",
     "mem0ai": "^2.2.2",

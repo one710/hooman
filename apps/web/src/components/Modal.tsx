@@ -5,6 +5,8 @@ export interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** Optional footer (e.g. button bar) that stays fixed; only body scrolls. */
+  footer?: React.ReactNode;
   /** Max width class, e.g. "max-w-md" or "max-w-2xl". Default max-w-md. */
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
@@ -22,6 +24,7 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
   maxWidth = "md",
 }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -47,15 +50,22 @@ export function Modal({
     >
       <div
         ref={contentRef}
-        className={`rounded-xl border border-hooman-border bg-hooman-surface shadow-xl w-full overflow-hidden ${maxWidthClasses[maxWidth]}`}
+        className={`flex max-h-[90vh] flex-col rounded-xl border border-hooman-border bg-hooman-surface shadow-xl w-full overflow-hidden ${maxWidthClasses[maxWidth]}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-2 border-b border-hooman-border">
+        <div className="shrink-0 px-5 pt-5 pb-2 border-b border-hooman-border">
           <h2 id="modal-title" className="text-lg font-semibold text-white">
             {title}
           </h2>
         </div>
-        <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {children}
+        </div>
+        {footer != null && (
+          <div className="shrink-0 border-t border-hooman-border px-5 py-3">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

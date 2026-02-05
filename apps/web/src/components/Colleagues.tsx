@@ -138,6 +138,16 @@ export function Colleagues() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing === "new" ? "New colleague" : "Edit colleague"}
+        footer={
+          <div className="flex gap-2">
+            <Button variant="success" onClick={save}>
+              Save
+            </Button>
+            <Button variant="secondary" onClick={() => setEditing(null)}>
+              Cancel
+            </Button>
+          </div>
+        }
       >
         {error && (
           <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
@@ -185,14 +195,6 @@ export function Colleagues() {
             }
             placeholder="Pick capabilities for this colleague"
           />
-          <div className="flex gap-2 pt-2">
-            <Button variant="success" onClick={save}>
-              Save
-            </Button>
-            <Button variant="secondary" onClick={() => setEditing(null)}>
-              Cancel
-            </Button>
-          </div>
         </div>
       </Modal>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">

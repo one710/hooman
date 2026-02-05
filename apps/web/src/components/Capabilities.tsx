@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Loader2, FileText } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useDialog } from "./Dialog";
 import { Button } from "./Button";
 import { Input } from "./Input";
@@ -17,7 +19,12 @@ import {
   createMCPConnection,
   updateMCPConnection,
   deleteMCPConnection,
+  getSkillsList,
+  getSkillContent,
+  addSkillsPackage,
+  removeSkillsPackage,
 } from "../api";
+import type { SkillEntry } from "../api";
 
 const CONNECTION_TYPE_OPTIONS: {
   value: MCPConnection["type"];
@@ -40,8 +47,11 @@ function connectionTypeBadge(c: MCPConnection): string {
   return "Stdio";
 }
 
+type CapabilityTab = "mcp" | "skills";
+
 export function Capabilities() {
   const dialog = useDialog();
+  const [activeTab, setActiveTab] = useState<CapabilityTab>("mcp");
   const [connections, setConnections] = useState<MCPConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -51,6 +61,20 @@ export function Capabilities() {
     { key: string; value: string }[]
   >([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Skills tab state (global ~/.agents only; list from filesystem + SKILL.md frontmatter)
+  const [skillsList, setSkillsList] = useState<SkillEntry[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillsAddOpen, setSkillsAddOpen] = useState(false);
+  const [skillsAddSubmitting, setSkillsAddSubmitting] = useState(false);
+  const [skillView, setSkillView] = useState<{
+    name: string;
+    content: string;
+  } | null>(null);
+  const [skillViewLoading, setSkillViewLoading] = useState(false);
+  const [addPackage, setAddPackage] = useState("");
+  const [addSkillsRaw, setAddSkillsRaw] = useState("");
+  const [skillsError, setSkillsError] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -64,6 +88,23 @@ export function Capabilities() {
   useEffect(() => {
     load();
   }, []);
+
+  async function loadSkills() {
+    setSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      const res = await getSkillsList();
+      setSkillsList(res.skills ?? []);
+    } catch (e) {
+      setSkillsError((e as Error).message);
+    } finally {
+      setSkillsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "skills") loadSkills();
+  }, [activeTab]);
 
   function startAdd() {
     setEditing("new");
@@ -180,7 +221,7 @@ export function Capabilities() {
     }
   }
 
-  if (loading && connections.length === 0) {
+  if (loading && connections.length === 0 && activeTab === "mcp") {
     return (
       <div className="p-4 md:p-6 text-hooman-muted">Loading capabilities…</div>
     );
@@ -188,348 +229,608 @@ export function Capabilities() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
-        <div className="min-w-0">
-          <h2 className="text-base md:text-lg font-semibold text-white">
-            Capabilities
-          </h2>
-          <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Connect tools and services so Hooman can act on your behalf.
-          </p>
+      <header className="px-4 md:px-6 py-3 md:py-4 flex flex-col gap-3 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base md:text-lg font-semibold text-white">
+              Capabilities
+            </h2>
+            <p className="text-xs md:text-sm text-hooman-muted truncate">
+              Connect tools and services so Hooman can act on your behalf.
+            </p>
+          </div>
+          {activeTab === "mcp" && (
+            <Button
+              onClick={startAdd}
+              className="self-start sm:self-auto"
+              icon={<Plus className="w-4 h-4" />}
+            >
+              Add connection
+            </Button>
+          )}
+          {activeTab === "skills" && (
+            <Button
+              onClick={() => {
+                setSkillsError(null);
+                setAddPackage("");
+                setAddSkillsRaw("");
+                setSkillsAddOpen(true);
+              }}
+              className="self-start sm:self-auto"
+              icon={<Plus className="w-4 h-4" />}
+            >
+              Add skill
+            </Button>
+          )}
         </div>
-        <Button
-          onClick={startAdd}
-          className="self-start sm:self-auto"
-          icon={<Plus className="w-4 h-4" />}
-        >
-          Add connection
-        </Button>
+        <div className="flex gap-1 border-b border-hooman-border -mb-px mt-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("mcp")}
+            className={`px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+              activeTab === "mcp"
+                ? "border-hooman-accent text-white bg-hooman-surface"
+                : "border-transparent text-hooman-muted hover:text-white"
+            }`}
+          >
+            MCP servers
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("skills")}
+            className={`px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+              activeTab === "skills"
+                ? "border-hooman-accent text-white bg-hooman-surface"
+                : "border-transparent text-hooman-muted hover:text-white"
+            }`}
+          >
+            Skills
+          </button>
+        </div>
       </header>
-      <Modal
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing === "new" ? "New connection" : "Edit connection"}
-        maxWidth="2xl"
-      >
-        {error && (
-          <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
-            {error}
-          </div>
-        )}
-        <div className="space-y-3">
-          <Select<MCPConnection["type"]>
-            label="Type"
-            value={form.type ?? "hosted"}
-            options={CONNECTION_TYPE_OPTIONS}
-            onChange={(type) => {
-              if (type === "stdio") {
-                setArgsRaw("");
-                setEnvEntries([]);
-              }
-              setForm((f) => ({
-                ...f,
-                type,
-                ...(type === "hosted"
-                  ? {
-                      server_label: "",
-                      require_approval: "never" as const,
-                      streaming: false,
-                    }
-                  : type === "streamable_http"
-                    ? { name: "", url: "", cache_tools_list: true }
-                    : {
-                        name: "",
-                        command: "",
-                        args: [],
-                        env: undefined,
-                        cwd: undefined,
-                      }),
-              }));
-            }}
-          />
-
-          {form.type === "hosted" && (
-            <>
-              <Input
-                label="Server label"
-                placeholder="e.g. gitmcp"
-                value={form.server_label ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, server_label: e.target.value }))
-                }
-              />
-              <Input
-                label="Server URL"
-                placeholder="https://gitmcp.io/openai/codex"
-                value={form.server_url ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, server_url: e.target.value }))
-                }
-              />
-              <Select<"always" | "never">
-                label="Require approval"
-                value={
-                  typeof form.require_approval === "string"
-                    ? form.require_approval
-                    : "never"
-                }
-                options={[
-                  { value: "never", label: "Never" },
-                  { value: "always", label: "Always" },
-                ]}
-                onChange={(require_approval) =>
-                  setForm((f) => ({ ...f, require_approval }))
-                }
-              />
-              <Checkbox
-                id="hosted-streaming"
-                label="Streaming (stream hosted MCP results)"
-                checked={form.streaming ?? false}
-                onChange={(checked) =>
-                  setForm((f) => ({ ...f, streaming: checked }))
-                }
-              />
-            </>
-          )}
-
-          {form.type === "streamable_http" && (
-            <>
-              <Input
-                label="Name"
-                placeholder="e.g. Streamable HTTP Server"
-                value={form.name ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
-              />
-              <Input
-                label="URL"
-                placeholder="http://localhost:8000/mcp"
-                value={form.url ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, url: e.target.value }))
-                }
-              />
-              <Input
-                label="Timeout (seconds)"
-                placeholder="10"
-                type="number"
-                value={form.timeout_seconds ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    timeout_seconds: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  }))
-                }
-              />
-              <Checkbox
-                id="http-cache-tools"
-                label="Cache tools list"
-                checked={form.cache_tools_list ?? true}
-                onChange={(checked) =>
-                  setForm((f) => ({ ...f, cache_tools_list: checked }))
-                }
-              />
-              <Input
-                label="Max retry attempts"
-                placeholder="3"
-                type="number"
-                value={form.max_retry_attempts ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    max_retry_attempts: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  }))
-                }
-              />
-            </>
-          )}
-
-          {form.type === "stdio" && (
-            <>
-              <Input
-                label="Name"
-                placeholder="e.g. Filesystem Server"
-                value={form.name ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
-              />
-              <Input
-                label="Command"
-                placeholder="yarn"
-                value={form.command ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, command: e.target.value }))
-                }
-              />
-              <Input
-                label="Args (comma-separated)"
-                placeholder="-y, @modelcontextprotocol/server-filesystem, /path"
-                value={argsRaw}
-                onChange={(e) => setArgsRaw(e.target.value)}
-              />
-              <Input
-                label="Working directory (optional)"
-                placeholder="/path/to/cwd"
-                value={form.cwd ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, cwd: e.target.value }))
-                }
-              />
-              <div>
-                <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
-                  Environment variables (optional)
-                </div>
-                <div className="space-y-2">
-                  {envEntries.map((entry, i) => (
-                    <div key={i} className="flex gap-2 items-center flex-wrap">
-                      <Input
-                        placeholder="Key"
-                        value={entry.key}
-                        onChange={(e) =>
-                          setEnvEntries((prev) =>
-                            prev.map((p, j) =>
-                              j === i ? { ...p, key: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 min-w-[100px]"
-                      />
-                      <Input
-                        placeholder="Value"
-                        value={entry.value}
-                        onChange={(e) =>
-                          setEnvEntries((prev) =>
-                            prev.map((p, j) =>
-                              j === i ? { ...p, value: e.target.value } : p,
-                            ),
-                          )
-                        }
-                        className="flex-1 min-w-[100px]"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        icon={<Trash2 />}
-                        aria-label="Remove variable"
-                        onClick={() =>
-                          setEnvEntries((prev) =>
-                            prev.filter((_, j) => j !== i),
-                          )
-                        }
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    icon={<Plus />}
-                    onClick={() =>
-                      setEnvEntries((prev) => [...prev, { key: "", value: "" }])
-                    }
-                  >
-                    Add variable
-                  </Button>
-                </div>
+      {activeTab === "mcp" && (
+        <Modal
+          open={editing !== null}
+          onClose={() => setEditing(null)}
+          title={editing === "new" ? "New connection" : "Edit connection"}
+          maxWidth="2xl"
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex gap-2">
+                <Button variant="success" onClick={save}>
+                  Save
+                </Button>
+                <Button variant="secondary" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
               </div>
-            </>
-          )}
-
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-            <div className="flex gap-2">
-              <Button variant="success" onClick={save}>
-                Save
-              </Button>
-              <Button variant="secondary" onClick={() => setEditing(null)}>
-                Cancel
-              </Button>
+              <a
+                href="https://smithery.ai/servers"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-hooman-border bg-hooman-surface px-3 py-2 text-sm text-[#FF5601] hover:bg-[#FF5601]/10 hover:text-[#FF5601] focus:outline-none focus:ring-2 focus:ring-[#FF5601]/50 focus:ring-offset-2 focus:ring-offset-hooman-bg"
+              >
+                <img
+                  src="/smithery-logo.svg"
+                  alt=""
+                  className="h-4 w-auto"
+                  width={34}
+                  height={40}
+                />
+                Find on Smithery
+              </a>
             </div>
-            <a
-              href="https://smithery.ai/servers"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-hooman-border bg-hooman-surface px-3 py-2 text-sm text-[#FF5601] hover:bg-[#FF5601]/10 hover:text-[#FF5601] focus:outline-none focus:ring-2 focus:ring-[#FF5601]/50 focus:ring-offset-2 focus:ring-offset-hooman-bg"
-            >
-              <img
-                src="/smithery-logo.svg"
-                alt=""
-                className="h-4 w-auto"
-                width={34}
-                height={40}
-              />
-              Find on Smithery
-            </a>
+          }
+        >
+          {error && (
+            <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+              {error}
+            </div>
+          )}
+          <div className="space-y-3">
+            <Select<MCPConnection["type"]>
+              label="Type"
+              value={form.type ?? "hosted"}
+              options={CONNECTION_TYPE_OPTIONS}
+              onChange={(type) => {
+                if (type === "stdio") {
+                  setArgsRaw("");
+                  setEnvEntries([]);
+                }
+                setForm((f) => ({
+                  ...f,
+                  type,
+                  ...(type === "hosted"
+                    ? {
+                        server_label: "",
+                        require_approval: "never" as const,
+                        streaming: false,
+                      }
+                    : type === "streamable_http"
+                      ? { name: "", url: "", cache_tools_list: true }
+                      : {
+                          name: "",
+                          command: "",
+                          args: [],
+                          env: undefined,
+                          cwd: undefined,
+                        }),
+                }));
+              }}
+            />
+
+            {form.type === "hosted" && (
+              <>
+                <Input
+                  label="Server label"
+                  placeholder="e.g. gitmcp"
+                  value={form.server_label ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, server_label: e.target.value }))
+                  }
+                />
+                <Input
+                  label="Server URL"
+                  placeholder="https://gitmcp.io/openai/codex"
+                  value={form.server_url ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, server_url: e.target.value }))
+                  }
+                />
+                <Select<"always" | "never">
+                  label="Require approval"
+                  value={
+                    typeof form.require_approval === "string"
+                      ? form.require_approval
+                      : "never"
+                  }
+                  options={[
+                    { value: "never", label: "Never" },
+                    { value: "always", label: "Always" },
+                  ]}
+                  onChange={(require_approval) =>
+                    setForm((f) => ({ ...f, require_approval }))
+                  }
+                />
+                <Checkbox
+                  id="hosted-streaming"
+                  label="Streaming (stream hosted MCP results)"
+                  checked={form.streaming ?? false}
+                  onChange={(checked) =>
+                    setForm((f) => ({ ...f, streaming: checked }))
+                  }
+                />
+              </>
+            )}
+
+            {form.type === "streamable_http" && (
+              <>
+                <Input
+                  label="Name"
+                  placeholder="e.g. Streamable HTTP Server"
+                  value={form.name ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                />
+                <Input
+                  label="URL"
+                  placeholder="http://localhost:8000/mcp"
+                  value={form.url ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, url: e.target.value }))
+                  }
+                />
+                <Input
+                  label="Timeout (seconds)"
+                  placeholder="10"
+                  type="number"
+                  value={form.timeout_seconds ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      timeout_seconds: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    }))
+                  }
+                />
+                <Checkbox
+                  id="http-cache-tools"
+                  label="Cache tools list"
+                  checked={form.cache_tools_list ?? true}
+                  onChange={(checked) =>
+                    setForm((f) => ({ ...f, cache_tools_list: checked }))
+                  }
+                />
+                <Input
+                  label="Max retry attempts"
+                  placeholder="3"
+                  type="number"
+                  value={form.max_retry_attempts ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      max_retry_attempts: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    }))
+                  }
+                />
+              </>
+            )}
+
+            {form.type === "stdio" && (
+              <>
+                <Input
+                  label="Name"
+                  placeholder="e.g. Filesystem Server"
+                  value={form.name ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                />
+                <Input
+                  label="Command"
+                  placeholder="yarn"
+                  value={form.command ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, command: e.target.value }))
+                  }
+                />
+                <Input
+                  label="Args (comma-separated)"
+                  placeholder="-y, @modelcontextprotocol/server-filesystem, /path"
+                  value={argsRaw}
+                  onChange={(e) => setArgsRaw(e.target.value)}
+                />
+                <Input
+                  label="Working directory (optional)"
+                  placeholder="/path/to/cwd"
+                  value={form.cwd ?? ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, cwd: e.target.value }))
+                  }
+                />
+                <div>
+                  <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
+                    Environment variables (optional)
+                  </div>
+                  <div className="space-y-2">
+                    {envEntries.map((entry, i) => (
+                      <div
+                        key={i}
+                        className="flex gap-2 items-center flex-wrap"
+                      >
+                        <Input
+                          placeholder="Key"
+                          value={entry.key}
+                          onChange={(e) =>
+                            setEnvEntries((prev) =>
+                              prev.map((p, j) =>
+                                j === i ? { ...p, key: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className="flex-1 min-w-[100px]"
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={entry.value}
+                          onChange={(e) =>
+                            setEnvEntries((prev) =>
+                              prev.map((p, j) =>
+                                j === i ? { ...p, value: e.target.value } : p,
+                              ),
+                            )
+                          }
+                          className="flex-1 min-w-[100px]"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          icon={<Trash2 />}
+                          aria-label="Remove variable"
+                          onClick={() =>
+                            setEnvEntries((prev) =>
+                              prev.filter((_, j) => j !== i),
+                            )
+                          }
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={<Plus />}
+                      onClick={() =>
+                        setEnvEntries((prev) => [
+                          ...prev,
+                          { key: "", value: "" },
+                        ])
+                      }
+                    >
+                      Add variable
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      </Modal>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
-        {error && !editing && (
-          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
-            {error}
-          </div>
-        )}
-        <ul className="space-y-3">
-          {connections.map((c) => (
-            <li
-              key={c.id}
-              className="rounded-xl border border-hooman-border bg-hooman-surface p-4 flex items-start justify-between"
-            >
-              <div className="min-w-0">
-                <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-hooman-accent/20 text-hooman-accent mr-2">
-                  {connectionTypeBadge(c)}
-                </span>
-                <span className="font-medium text-white">
-                  {connectionLabel(c)}
-                </span>
-                {c.type === "hosted" && c.server_url && (
-                  <p className="text-xs text-hooman-muted truncate mt-0.5">
-                    {c.server_url}
-                  </p>
-                )}
-                {c.type === "streamable_http" && c.url && (
-                  <p className="text-xs text-hooman-muted truncate mt-0.5">
-                    {c.url}
-                  </p>
-                )}
-                {c.type === "stdio" && (
-                  <p className="text-xs text-hooman-muted truncate mt-0.5">
-                    {c.command} {c.args?.join(" ")}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2 shrink-0">
+        </Modal>
+      )}
+      {activeTab === "skills" && (
+        <Modal
+          open={skillsAddOpen}
+          onClose={() => setSkillsAddOpen(false)}
+          title="Add skill"
+          maxWidth="2xl"
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex gap-2">
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => startEdit(c)}
-                  className="text-hooman-accent"
+                  variant="success"
+                  disabled={skillsAddSubmitting}
+                  icon={
+                    skillsAddSubmitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+                    ) : undefined
+                  }
+                  onClick={async () => {
+                    if (!addPackage.trim()) {
+                      setSkillsError("Package name or URL is required.");
+                      return;
+                    }
+                    setSkillsError(null);
+                    setSkillsAddSubmitting(true);
+                    try {
+                      const skills = addSkillsRaw
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      await addSkillsPackage({
+                        package: addPackage.trim(),
+                        global: true,
+                        skills: skills.length > 0 ? skills : undefined,
+                      });
+                      setSkillsAddOpen(false);
+                      loadSkills();
+                    } catch (e) {
+                      setSkillsError((e as Error).message);
+                    } finally {
+                      setSkillsAddSubmitting(false);
+                    }
+                  }}
                 >
-                  Edit
+                  {skillsAddSubmitting ? "Adding…" : "Add"}
                 </Button>
-                <Button variant="danger" size="sm" onClick={() => remove(c.id)}>
-                  Remove
+                <Button
+                  variant="secondary"
+                  onClick={() => setSkillsAddOpen(false)}
+                  disabled={skillsAddSubmitting}
+                >
+                  Cancel
                 </Button>
               </div>
-            </li>
-          ))}
-        </ul>
-        {connections.length === 0 && !editing && (
-          <p className="text-hooman-muted text-sm">
-            No MCP connections yet. Add one to delegate tools.
-          </p>
+              <a
+                href="https://smithery.ai/skills"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-hooman-border bg-hooman-surface px-3 py-2 text-sm text-[#FF5601] hover:bg-[#FF5601]/10 hover:text-[#FF5601] focus:outline-none focus:ring-2 focus:ring-[#FF5601]/50 focus:ring-offset-2 focus:ring-offset-hooman-bg"
+              >
+                <img
+                  src="/smithery-logo.svg"
+                  alt=""
+                  className="h-4 w-auto"
+                  width={34}
+                  height={40}
+                />
+                Find on Smithery
+              </a>
+            </div>
+          }
+        >
+          {skillsError && (
+            <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+              {skillsError}
+            </div>
+          )}
+          <div className="space-y-3">
+            <Input
+              label="Package name or URL"
+              placeholder="e.g. vercel-labs/agent-skills or https://github.com/owner/repo"
+              value={addPackage}
+              onChange={(e) => setAddPackage(e.target.value)}
+            />
+            <Input
+              label="Skills (optional, comma-separated)"
+              placeholder="e.g. frontend-design, skill-creator"
+              value={addSkillsRaw}
+              onChange={(e) => setAddSkillsRaw(e.target.value)}
+            />
+          </div>
+        </Modal>
+      )}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
+        {activeTab === "mcp" && (
+          <>
+            {error && !editing && (
+              <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+                {error}
+              </div>
+            )}
+            <ul className="space-y-3">
+              {connections.map((c) => (
+                <li
+                  key={c.id}
+                  className="rounded-xl border border-hooman-border bg-hooman-surface p-4 flex items-start justify-between"
+                >
+                  <div className="min-w-0">
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-hooman-accent/20 text-hooman-accent mr-2">
+                      {connectionTypeBadge(c)}
+                    </span>
+                    <span className="font-medium text-white">
+                      {connectionLabel(c)}
+                    </span>
+                    {c.type === "hosted" && c.server_url && (
+                      <p className="text-xs text-hooman-muted truncate mt-0.5">
+                        {c.server_url}
+                      </p>
+                    )}
+                    {c.type === "streamable_http" && c.url && (
+                      <p className="text-xs text-hooman-muted truncate mt-0.5">
+                        {c.url}
+                      </p>
+                    )}
+                    {c.type === "stdio" && (
+                      <p className="text-xs text-hooman-muted truncate mt-0.5">
+                        {c.command} {c.args?.join(" ")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(c)}
+                      className="text-hooman-accent"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => remove(c.id)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {connections.length === 0 && !editing && (
+              <p className="text-hooman-muted text-sm">
+                No MCP connections yet. Add one to delegate tools.
+              </p>
+            )}
+          </>
+        )}
+        {activeTab === "skills" && (
+          <div className="space-y-4">
+            {skillsError && !skillsAddOpen && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">
+                {skillsError}
+              </div>
+            )}
+            <div>
+              {skillsLoading ? (
+                <p className="text-hooman-muted text-sm">Loading…</p>
+              ) : skillsList.length === 0 ? (
+                <p className="text-hooman-muted text-sm">
+                  No skills installed. Add one to install.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {skillsList.map((skill) => (
+                    <li
+                      key={skill.id}
+                      className="rounded-xl border border-hooman-border bg-hooman-surface p-4 flex items-start justify-between"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-white">
+                          {skill.name}
+                        </span>
+                        {skill.description && (
+                          <p className="text-xs text-hooman-muted mt-0.5 line-clamp-2">
+                            {skill.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<FileText className="w-4 h-4" />}
+                          onClick={async () => {
+                            setSkillViewLoading(true);
+                            setSkillsError(null);
+                            try {
+                              const { content } = await getSkillContent(
+                                skill.id,
+                              );
+                              setSkillView({ name: skill.name, content });
+                            } catch (e) {
+                              setSkillsError((e as Error).message);
+                            } finally {
+                              setSkillViewLoading(false);
+                            }
+                          }}
+                          disabled={skillViewLoading}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={async () => {
+                            const ok = await dialog.confirm({
+                              title: "Remove skill",
+                              message: `Remove skill "${skill.name}"?`,
+                              confirmLabel: "Remove",
+                              variant: "danger",
+                            });
+                            if (!ok) return;
+                            setSkillsError(null);
+                            try {
+                              await removeSkillsPackage([skill.id], true);
+                              loadSkills();
+                            } catch (e) {
+                              setSkillsError((e as Error).message);
+                            }
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
       </div>
+      {activeTab === "skills" && (
+        <Modal
+          open={skillView !== null}
+          onClose={() => setSkillView(null)}
+          title={skillView ? `SKILL.md — ${skillView.name}` : "Skill"}
+          maxWidth="2xl"
+          footer={
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setSkillView(null)}>
+                Close
+              </Button>
+            </div>
+          }
+        >
+          <div className="rounded-lg border border-hooman-border bg-hooman-bg p-4">
+            {skillView && (
+              <div className="prose prose-invert prose-sm max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {skillView.content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -17,6 +17,12 @@ import type {
 } from "./lib/types/index.js";
 import { randomUUID } from "crypto";
 import { getConfig, updateConfig } from "./config.js";
+import {
+  listSkillsFromFs,
+  getSkillContent,
+  addSkill,
+  removeSkills,
+} from "./lib/skills-cli/index.js";
 
 interface AppContext {
   eventRouter: EventRouter;
@@ -374,6 +380,98 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
       res.status(204).send();
     },
   );
+
+  // Skills: list from ~/.agents filesystem; add/remove via npx skills CLI
+  app.get("/api/skills/list", async (_req: Request, res: Response) => {
+    try {
+      const skills = await listSkillsFromFs();
+      res.json({ skills });
+    } catch (err) {
+      debug("skills list error: %o", err);
+      res.status(500).json({
+        skills: [],
+        error: (err as Error).message,
+      });
+    }
+  });
+
+  app.get("/api/skills/:id/content", async (req: Request, res: Response) => {
+    const id =
+      typeof req.params.id === "string"
+        ? req.params.id
+        : (req.params.id?.[0] ?? "");
+    if (!id) {
+      res.status(400).json({ error: "Missing skill id." });
+      return;
+    }
+    try {
+      const content = await getSkillContent(id);
+      if (content === null) {
+        res.status(404).json({ error: "Skill not found." });
+        return;
+      }
+      res.json({ content });
+    } catch (err) {
+      debug("skills content error: %o", err);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post("/api/skills/add", async (req: Request, res: Response) => {
+    const body = req.body as {
+      package?: string;
+      global?: boolean;
+      skills?: string[];
+    };
+    const pkg = body?.package;
+    if (!pkg || typeof pkg !== "string" || !pkg.trim()) {
+      res.status(400).json({ error: "Missing or invalid 'package'." });
+      return;
+    }
+    try {
+      const result = await addSkill({
+        package: pkg.trim(),
+        global: Boolean(body?.global),
+        skills: Array.isArray(body?.skills) ? body.skills : undefined,
+      });
+      res.json({
+        output: result.stdout,
+        error: result.stderr.trim() || undefined,
+        code: result.code,
+      });
+    } catch (err) {
+      debug("skills add error: %o", err);
+      res.status(500).json({
+        output: "",
+        error: (err as Error).message,
+        code: 1,
+      });
+    }
+  });
+
+  app.post("/api/skills/remove", async (req: Request, res: Response) => {
+    const body = req.body as { skills?: string[]; global?: boolean };
+    const skills = Array.isArray(body?.skills) ? body.skills : [];
+    if (skills.length === 0) {
+      res.status(400).json({ error: "Missing or invalid 'skills' array." });
+      return;
+    }
+    try {
+      const result = await removeSkills(skills, Boolean(body?.global));
+      res.json({
+        output: result.stdout,
+        error: result.stderr.trim() || undefined,
+        code: result.code,
+      });
+    } catch (err) {
+      debug("skills remove error: %o", err);
+      res.status(500).json({
+        output: "",
+        error: (err as Error).message,
+        code: 1,
+      });
+    }
+  });
 
   // Scheduling
   app.get("/api/schedule", (_req: Request, res: Response) => {
