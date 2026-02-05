@@ -446,13 +446,30 @@ export function Capabilities() {
             </>
           )}
 
-          <div className="flex gap-2 pt-2">
-            <Button variant="success" onClick={save}>
-              Save
-            </Button>
-            <Button variant="secondary" onClick={() => setEditing(null)}>
-              Cancel
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <div className="flex gap-2">
+              <Button variant="success" onClick={save}>
+                Save
+              </Button>
+              <Button variant="secondary" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+            </div>
+            <a
+              href="https://smithery.ai/servers"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-hooman-border bg-hooman-surface px-3 py-2 text-sm text-[#FF5601] hover:bg-[#FF5601]/10 hover:text-[#FF5601] focus:outline-none focus:ring-2 focus:ring-[#FF5601]/50 focus:ring-offset-2 focus:ring-offset-hooman-bg"
+            >
+              <img
+                src="/smithery-logo.svg"
+                alt=""
+                className="h-4 w-auto"
+                width={34}
+                height={40}
+              />
+              Find on Smithery
+            </a>
           </div>
         </div>
       </Modal>

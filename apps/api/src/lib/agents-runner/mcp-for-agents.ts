@@ -32,9 +32,16 @@ function getConnectionIdsFromAllowedCapabilities(
   return ids;
 }
 
+/** Default working directory for stdio MCP when cwd not set (e.g. /app/mcp-cwd in Docker). */
+const DEFAULT_STDIO_CWD =
+  (typeof process.env.MCP_STDIO_DEFAULT_CWD === "string" &&
+    process.env.MCP_STDIO_DEFAULT_CWD.trim()) ||
+  undefined;
+
 /** Build one MCP server instance from a stdio connection config. */
 function buildStdioServer(c: MCPConnectionStdio): MCPServerStdio {
   const hasArgs = Array.isArray(c.args) && c.args.length > 0;
+  const cwd = c.cwd?.trim() || DEFAULT_STDIO_CWD;
   return new MCPServerStdio({
     name: c.name || c.id,
     ...(hasArgs
@@ -46,7 +53,7 @@ function buildStdioServer(c: MCPConnectionStdio): MCPServerStdio {
         }),
     cacheToolsList: true,
     ...(c.env && Object.keys(c.env).length > 0 ? { env: c.env } : {}),
-    ...(c.cwd?.trim() ? { cwd: c.cwd.trim() } : {}),
+    ...(cwd ? { cwd } : {}),
   });
 }
 
