@@ -7,7 +7,8 @@ export type EventSource =
   | "internal"
   | "slack"
   | "email"
-  | "whatsapp";
+  | "whatsapp"
+  | "jira";
 
 export interface BaseEvent {
   id: string;
@@ -79,10 +80,28 @@ export interface WhatsAppChannelConfig {
   filterList?: string[];
 }
 
+export interface JiraChannelConfig {
+  enabled: boolean;
+  /** Jira base URL (e.g. https://your-domain.atlassian.net). */
+  baseUrl: string;
+  /** Atlassian account email for API auth. */
+  email: string;
+  /** Jira API token (from id.atlassian.com). */
+  apiToken: string;
+  /** Poll interval in ms. Default 300000 (5 min). */
+  pollIntervalMs: number;
+  /** JQL for issues to poll (e.g. assignee = currentUser() ORDER BY updated DESC). Optional. */
+  jql?: string;
+  filterMode?: FilterMode;
+  /** Project keys for allowlist/blocklist. */
+  filterList?: string[];
+}
+
 export interface ChannelsConfig {
   slack?: SlackChannelConfig;
   email?: EmailChannelConfig;
   whatsapp?: WhatsAppChannelConfig;
+  jira?: JiraChannelConfig;
 }
 
 // Normalized events: common payload shape regardless of source (PRD §8)
@@ -109,15 +128,70 @@ export interface OriginalMessageInfo {
   timestamp?: string;
 }
 
-/** Channel metadata for non-api sources: who/where/message ID, directness, optional original message. Delivered in run context to colleagues. */
-export interface ChannelMeta {
-  channel: "slack" | "email" | "whatsapp";
-  /** e.g. channelId (Slack), to/from (email), chatId (WhatsApp). */
-  [key: string]: unknown;
+/** Base channel metadata: directness and optional original message. All channel-specific meta extends this. */
+export interface ChannelMetaBase {
   directness: "direct" | "neutral";
   directnessReason?: string;
   originalMessage?: OriginalMessageInfo;
 }
+
+/** Slack channel metadata. */
+export interface SlackChannelMeta extends ChannelMetaBase {
+  channel: "slack";
+  channelId: string;
+  messageTs: string;
+  threadTs?: string;
+  senderId: string;
+  senderName?: string;
+  destinationType: "dm" | "channel" | "group";
+  mentionedIds?: string[];
+  selfMentioned?: boolean;
+}
+
+/** Email channel metadata. */
+export interface EmailChannelMeta extends ChannelMetaBase {
+  channel: "email";
+  messageId: string;
+  to: string;
+  from: string;
+  fromName?: string;
+  inReplyTo?: string;
+  references?: string;
+  destinationType: "inbox";
+  toAddresses: string[];
+  ccAddresses: string[];
+  bccAddresses: string[];
+  selfInRecipients: boolean;
+}
+
+/** WhatsApp channel metadata. */
+export interface WhatsAppChannelMeta extends ChannelMetaBase {
+  channel: "whatsapp";
+  chatId: string;
+  messageId: string;
+  pushName?: string;
+  destinationType: "dm" | "group";
+  mentionedIds?: string[];
+  selfMentioned?: boolean;
+}
+
+/** Jira channel metadata. */
+export interface JiraChannelMeta extends ChannelMetaBase {
+  channel: "jira";
+  issueKey: string;
+  projectKey: string;
+  messageId: string;
+  senderId: string;
+  senderName?: string;
+  destinationType: "issue";
+}
+
+/** Union of all channel-specific metadata. Delivered in run context to colleagues. */
+export type ChannelMeta =
+  | SlackChannelMeta
+  | EmailChannelMeta
+  | WhatsAppChannelMeta
+  | JiraChannelMeta;
 
 export interface NormalizedMessagePayload {
   kind: "message";
@@ -126,7 +200,7 @@ export interface NormalizedMessagePayload {
   attachments?: ChatAttachment[];
   /** IDs of uploaded files (for persisting with chat history). */
   attachment_ids?: string[];
-  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to colleagues. */
+  /** Present for slack/email/whatsapp/jira; who, where, message ID, directness. Passed in run context to colleagues. */
   channelMeta?: ChannelMeta;
 }
 

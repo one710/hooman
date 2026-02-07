@@ -8,7 +8,7 @@ import { simpleParser } from "mailparser";
 import type { AddressObject } from "mailparser";
 import type {
   EventDispatcher,
-  ChannelMeta,
+  EmailChannelMeta,
   EmailChannelConfig,
 } from "../core/types.js";
 
@@ -59,6 +59,17 @@ function applyFilter(
   return !match; // blocklist
 }
 
+/** Self-identity addresses for directness and skip-self check (IMAP user or identityAddresses). */
+function getSelfIdentities(config: EmailChannelConfig): string[] {
+  const rawIdentities =
+    (config.identityAddresses?.length ?? 0) > 0
+      ? (config.identityAddresses ?? [])
+      : config.imap?.user
+        ? [config.imap.user]
+        : [];
+  return rawIdentities.map((a) => normalizeAddress(a));
+}
+
 function getDirectness(
   config: EmailChannelConfig,
   parsed: {
@@ -70,9 +81,7 @@ function getDirectness(
   directness: "direct" | "neutral";
   directnessReason?: "to" | "cc" | "bcc";
 } {
-  const identities = (config.identityAddresses ?? []).map((a) =>
-    normalizeAddress(a),
-  );
+  const identities = getSelfIdentities(config);
   if (identities.length === 0) return { directness: "neutral" };
 
   const toList = getAddressList(parsed.to);
@@ -154,6 +163,15 @@ function poll(dispatcher: EventDispatcher, config: EmailChannelConfig): void {
                   const parsed = await simpleParser(raw);
                   const from = senderFromParsed(parsed);
                   if (!from.address) continue;
+                  const selfIdentities = getSelfIdentities(config);
+                  if (selfIdentities.includes(from.address)) {
+                    debug(
+                      "Ignoring email sent by self, not queuing: from=%s messageId=%s",
+                      from.address,
+                      parsed.messageId ?? "(none)",
+                    );
+                    continue;
+                  }
                   const fromDomain = from.address.includes("@")
                     ? (from.address.split("@")[1] ?? "")
                     : "";
@@ -170,25 +188,38 @@ function poll(dispatcher: EventDispatcher, config: EmailChannelConfig): void {
                     config,
                     parsed,
                   );
-                  const toStr = getAddressList(parsed.to).join(", ");
-                  const channelMeta: ChannelMeta = {
+                  const toList = getAddressList(parsed.to);
+                  const ccList = getAddressList(parsed.cc);
+                  const bccList = getAddressList(parsed.bcc);
+                  const channelMeta: EmailChannelMeta = {
                     channel: "email",
                     messageId: parsed.messageId ?? "",
-                    to: toStr,
+                    destinationType: "inbox",
+                    toAddresses: toList,
+                    ccAddresses: ccList,
+                    bccAddresses: bccList,
+                    selfInRecipients: directness === "direct",
+                    to: toList.join(", "),
                     from: from.address,
-                    fromName: from.name,
-                    inReplyTo: parsed.inReplyTo,
-                    references: parsed.references?.toString(),
                     directness,
                     directnessReason,
+                    ...(from.name ? { fromName: from.name } : {}),
+                    ...(parsed.inReplyTo
+                      ? { inReplyTo: parsed.inReplyTo }
+                      : {}),
+                    ...(parsed.references
+                      ? { references: parsed.references.toString() }
+                      : {}),
+                    ...(parsed.inReplyTo
+                      ? {
+                          originalMessage: {
+                            from: from.address,
+                            fromName: from.name,
+                            messageId: parsed.inReplyTo,
+                          },
+                        }
+                      : {}),
                   };
-                  if (parsed.inReplyTo) {
-                    channelMeta.originalMessage = {
-                      from: from.address,
-                      fromName: from.name,
-                      messageId: parsed.inReplyTo,
-                    };
-                  }
 
                   const attachments = (parsed.attachments ?? []).map((a) => ({
                     name: a.filename ?? "attachment",

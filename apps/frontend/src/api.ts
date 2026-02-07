@@ -216,6 +216,7 @@ export async function patchChannels(patch: {
   slack?: Record<string, unknown>;
   email?: Record<string, unknown>;
   whatsapp?: Record<string, unknown>;
+  jira?: Record<string, unknown>;
 }): Promise<{ channels: Record<string, unknown> }> {
   const res = await fetch(`${BASE}/api/channels`, {
     method: "PATCH",
@@ -230,6 +231,10 @@ export async function patchChannels(patch: {
 export async function getWhatsAppConnection(): Promise<{
   status: "disconnected" | "pairing" | "connected";
   qr?: string;
+  /** Logged-in user ID (e.g. 1234567890@c.us). */
+  selfId?: string;
+  /** Display number (e.g. +1234567890). */
+  selfNumber?: string;
 }> {
   const res = await fetch(`${BASE}/api/channels/whatsapp/connection`);
   if (!res.ok) return { status: "disconnected" };

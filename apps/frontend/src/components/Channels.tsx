@@ -110,6 +110,7 @@ export function Channels() {
       if (id === "email") patch.email = { ...current.config, enabled: next };
       if (id === "whatsapp")
         patch.whatsapp = { ...current.config, enabled: next };
+      if (id === "jira") patch.jira = { ...current.config, enabled: next };
       await patchChannels(patch);
       load();
     } catch (e) {
@@ -126,6 +127,7 @@ export function Channels() {
       if (id === "slack") patch.slack = config;
       if (id === "email") patch.email = config;
       if (id === "whatsapp") patch.whatsapp = config;
+      if (id === "jira") patch.jira = config;
       await patchChannels(patch);
       setConfigModalChannel(null);
       load();
@@ -144,7 +146,7 @@ export function Channels() {
     );
   }
 
-  const order = ["web", "slack", "email", "whatsapp"];
+  const order = ["web", "slack", "email", "whatsapp", "jira"];
   const list = order
     .map((id) => channels?.[id])
     .filter(Boolean) as ChannelEntry[];
@@ -156,8 +158,8 @@ export function Channels() {
           Channels
         </h2>
         <p className="text-xs md:text-sm text-hooman-muted">
-          Manage where Hooman receives messages (web, Slack, email). Sending is
-          handled by colleagues.
+          Manage where Hooman receives messages (web, Slack, email, Jira).
+          Sending is handled by colleagues.
         </p>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
@@ -302,6 +304,8 @@ function SlackManifestModal({ onClose }: { onClose: () => void }) {
 type WhatsAppConnection = {
   status: "disconnected" | "pairing" | "connected";
   qr?: string;
+  selfId?: string;
+  selfNumber?: string;
 };
 
 function ConfigModal({
@@ -386,6 +390,14 @@ function ConfigModal({
           saving={saving}
         />
       )}
+      {channel.id === "jira" && (
+        <JiraConfigForm
+          id={formId}
+          config={config}
+          onSave={onSave}
+          saving={saving}
+        />
+      )}
     </Modal>
   );
 }
@@ -412,7 +424,10 @@ function WhatsAppConnectionBlock({
       <p className="text-sm font-medium text-white mb-2">Link device</p>
       {status === "connected" && (
         <p className="text-sm text-green-500">
-          Linked — WhatsApp is connected.
+          Linked
+          {connection?.selfNumber || connection?.selfId
+            ? ` — Connected as ${connection.selfNumber ?? connection.selfId}`
+            : " — WhatsApp is connected."}
         </p>
       )}
       {status === "pairing" && connection?.qr && (
@@ -572,7 +587,9 @@ function EmailConfigForm({
   const [password, setPassword] = useState(String(imap.password ?? ""));
   const [tls, setTls] = useState(imap.tls !== false);
   const [pollIntervalMinutes, setPollIntervalMinutes] = useState(
-    String(Math.max(1, Math.round((config.pollIntervalMs ?? 60000) / 60000))),
+    String(
+      Math.max(1, Math.round((Number(config.pollIntervalMs) || 60000) / 60000)),
+    ),
   );
   const [folders, setFolders] = useState(
     Array.isArray(config.folders) ? config.folders.join(", ") : "INBOX",
@@ -671,6 +688,9 @@ function EmailConfigForm({
         value={identityAddresses}
         onChange={(e) => setIdentityAddresses(e.target.value)}
       />
+      <p className="text-xs text-hooman-muted -mt-2">
+        Leave empty to use the IMAP inbox user as your identity for directness.
+      </p>
       <Select
         label="Filter mode"
         value={filterMode}
@@ -752,6 +772,119 @@ function WhatsAppConfigForm({
       {filterMode !== "all" && (
         <Input
           label="Filter list (numbers/group IDs, comma-separated)"
+          value={filterList}
+          onChange={(e) => setFilterList(e.target.value)}
+        />
+      )}
+    </form>
+  );
+}
+
+function JiraConfigForm({
+  id,
+  config,
+  onSave,
+  saving,
+}: {
+  id: string;
+  config: Record<string, unknown>;
+  onSave: (c: Record<string, unknown>) => void;
+  saving: boolean;
+}) {
+  const [baseUrl, setBaseUrl] = useState(
+    String(config.baseUrl ?? "https://your-domain.atlassian.net"),
+  );
+  const [email, setEmail] = useState(String(config.email ?? ""));
+  const [apiToken, setApiToken] = useState(String(config.apiToken ?? ""));
+  const [pollIntervalMinutes, setPollIntervalMinutes] = useState(
+    String(
+      Math.max(
+        1,
+        Math.round((Number(config.pollIntervalMs) || 300000) / 60000),
+      ),
+    ),
+  );
+  const [jql, setJql] = useState(
+    String(config.jql ?? "assignee = currentUser() ORDER BY updated DESC"),
+  );
+  const [filterMode, setFilterMode] = useState(
+    String(config.filterMode ?? "all"),
+  );
+  const [filterList, setFilterList] = useState(
+    Array.isArray(config.filterList) ? config.filterList.join(", ") : "",
+  );
+
+  return (
+    <form
+      id={id}
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({
+          ...config,
+          enabled: config.enabled ?? false,
+          baseUrl: baseUrl.trim(),
+          email: email.trim(),
+          apiToken: apiToken.trim() || undefined,
+          pollIntervalMs:
+            Math.max(1, parseInt(pollIntervalMinutes, 10) || 5) * 60 * 1000,
+          jql: jql.trim() || undefined,
+          filterMode: filterMode || "all",
+          filterList: filterList
+            ? filterList
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : undefined,
+        });
+      }}
+    >
+      <Input
+        label="Jira base URL"
+        placeholder="https://your-domain.atlassian.net"
+        value={baseUrl}
+        onChange={(e) => setBaseUrl(e.target.value)}
+      />
+      <Input
+        label="Atlassian account email"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <Input
+        label="API token"
+        type="password"
+        placeholder="Leave blank to keep current (from id.atlassian.com)"
+        value={apiToken}
+        onChange={(e) => setApiToken(e.target.value)}
+      />
+      <Input
+        label="Poll interval (minutes)"
+        type="number"
+        min={1}
+        value={pollIntervalMinutes}
+        onChange={(e) => setPollIntervalMinutes(e.target.value)}
+      />
+      <Input
+        label="JQL (optional)"
+        placeholder="assignee = currentUser() ORDER BY updated DESC"
+        value={jql}
+        onChange={(e) => setJql(e.target.value)}
+      />
+      <Select
+        label="Filter mode (by project)"
+        value={filterMode}
+        onChange={(value) => setFilterMode(value)}
+        options={[
+          { value: "all", label: "All projects" },
+          { value: "allowlist", label: "Allowlist" },
+          { value: "blocklist", label: "Blocklist" },
+        ]}
+      />
+      {filterMode !== "all" && (
+        <Input
+          label="Filter list (project keys, comma-separated)"
+          placeholder="PROJ, DEV"
           value={filterList}
           onChange={(e) => setFilterList(e.target.value)}
         />

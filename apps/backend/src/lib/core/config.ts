@@ -71,6 +71,7 @@ export function updateChannelsConfig(
   if (patch.slack !== undefined) channelsStore.slack = patch.slack;
   if (patch.email !== undefined) channelsStore.email = patch.email;
   if (patch.whatsapp !== undefined) channelsStore.whatsapp = patch.whatsapp;
+  if (patch.jira !== undefined) channelsStore.jira = patch.jira;
   persist().catch((err) => debug("persist error: %o", err));
   return getChannelsConfig();
 }

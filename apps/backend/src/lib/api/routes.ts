@@ -587,6 +587,24 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
               enabled: false,
               config: null,
             },
+        jira: channels.jira
+          ? {
+              id: "jira",
+              name: "Jira",
+              alwaysOn: false,
+              enabled: channels.jira.enabled,
+              config: {
+                ...channels.jira,
+                apiToken: mask(channels.jira.apiToken),
+              },
+            }
+          : {
+              id: "jira",
+              name: "Jira",
+              alwaysOn: false,
+              enabled: false,
+              config: null,
+            },
       },
     });
   });
@@ -641,11 +659,23 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
           ...current.whatsapp,
           ...body.whatsapp,
         } as ChannelsConfig["whatsapp"];
+      if (body.jira !== undefined) {
+        const b = body.jira as ChannelsConfig["jira"];
+        const c = current.jira;
+        patch.jira = {
+          ...c,
+          ...b,
+          apiToken: isMasked(b?.apiToken)
+            ? (c?.apiToken ?? b?.apiToken)
+            : b?.apiToken,
+        } as ChannelsConfig["jira"];
+      }
       updateChannelsConfig(patch);
       const channelScopes: ReloadScope[] = [];
       if (body.slack !== undefined) channelScopes.push("slack");
       if (body.email !== undefined) channelScopes.push("email");
       if (body.whatsapp !== undefined) channelScopes.push("whatsapp");
+      if (body.jira !== undefined) channelScopes.push("jira");
       if (channelScopes.length)
         await setReloadFlags(env.REDIS_URL, channelScopes);
       res.json({ channels: getChannelsConfig() });
@@ -672,12 +702,20 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
           return;
         }
       }
-      const body = req.body as { status?: string; qr?: string };
+      const body = req.body as {
+        status?: string;
+        qr?: string;
+        selfId?: string;
+        selfNumber?: string;
+      };
       const status = body?.status ?? "disconnected";
       const qr = typeof body?.qr === "string" ? body.qr : undefined;
+      const selfId = typeof body?.selfId === "string" ? body.selfId : undefined;
+      const selfNumber =
+        typeof body?.selfNumber === "string" ? body.selfNumber : undefined;
       setWhatsAppConnection(
         status === "connected"
-          ? { status: "connected" }
+          ? { status: "connected", selfId, selfNumber }
           : status === "pairing" && qr
             ? { status: "pairing", qr }
             : { status: "disconnected" },

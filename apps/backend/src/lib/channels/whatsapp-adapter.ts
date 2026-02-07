@@ -6,7 +6,7 @@ import createDebug from "debug";
 import { join } from "path";
 import type {
   EventDispatcher,
-  ChannelMeta,
+  WhatsAppChannelMeta,
   WhatsAppChannelConfig,
 } from "../core/types.js";
 import { WORKSPACE_ROOT } from "../core/workspace.js";
@@ -42,10 +42,14 @@ function applyFilter(config: WhatsAppChannelConfig, chatId: string): boolean {
 }
 
 export interface WhatsAppAdapterOptions {
-  /** Called when connection state or QR changes; worker can POST to API so the UI can show the QR. */
+  /** Called when connection state or QR changes; worker can POST to API so the UI can show the QR. When connected, includes self identity (logged-in number). */
   onConnectionUpdate?: (data: {
     status: "disconnected" | "pairing" | "connected";
     qr?: string;
+    /** Logged-in user ID (e.g. 1234567890@c.us). */
+    selfId?: string;
+    /** Display number (e.g. +1234567890). */
+    selfNumber?: string;
   }) => void;
 }
 
@@ -72,9 +76,10 @@ export async function startWhatsAppAdapter(
   const notify = (
     status: "disconnected" | "pairing" | "connected",
     qr?: string,
+    self?: { selfId: string; selfNumber?: string },
   ) => {
     try {
-      onConnectionUpdate?.({ status, qr });
+      onConnectionUpdate?.({ status, qr, ...self });
     } catch (e) {
       debug("onConnectionUpdate error: %o", e);
     }
@@ -98,14 +103,40 @@ export async function startWhatsAppAdapter(
     },
   });
 
+  let selfIdForMeta: string | undefined;
   client.on("qr", (qr: string) => {
     debug("QR received, sending to Settings UI");
     notify("pairing", qr);
   });
 
   client.on("ready", () => {
-    debug("Linked; client ready");
-    notify("connected");
+    if (!client) return;
+    // Self-identity from logged-in client (like Jira currentUser())
+    const info = client.info as
+      | { wid?: { _serialized?: string; user?: string } }
+      | undefined;
+    const wid = info?.wid;
+    const selfIdRaw =
+      wid && typeof wid === "object" && "_serialized" in wid
+        ? (wid as { _serialized?: string })._serialized
+        : undefined;
+    const selfId = typeof selfIdRaw === "string" ? selfIdRaw : "";
+    selfIdForMeta = selfId || undefined;
+    const userPart =
+      wid && typeof wid === "object" && "user" in wid
+        ? (wid as { user?: string }).user
+        : undefined;
+    const selfNumber =
+      typeof userPart === "string" && userPart
+        ? userPart.startsWith("+")
+          ? userPart
+          : `+${userPart}`
+        : undefined;
+    debug(
+      "Linked; client ready (self: %s)",
+      selfId || selfNumber || "(unknown)",
+    );
+    notify("connected", undefined, selfId ? { selfId, selfNumber } : undefined);
   });
 
   client.on("authenticated", () => {
@@ -127,7 +158,13 @@ export async function startWhatsAppAdapter(
     async (message: import("whatsapp-web.js").Message) => {
       const cfg = getWhatsAppConfig();
       if (!cfg?.enabled) return;
-      if (message.fromMe) return;
+      if (message.fromMe) {
+        debug(
+          "Ignoring WhatsApp message from self (fromMe), not queuing: chatId=%s",
+          message.from,
+        );
+        return;
+      }
 
       const text = typeof message.body === "string" ? message.body.trim() : "";
       if (!text) return;
@@ -139,6 +176,7 @@ export async function startWhatsAppAdapter(
       }
 
       const isDirect = chatId.endsWith("@c.us");
+      const destinationType = isDirect ? "dm" : "group";
       const directness: "direct" | "neutral" = isDirect ? "direct" : "neutral";
       const directnessReason = isDirect ? "dm" : "group";
       const messageId =
@@ -146,21 +184,20 @@ export async function startWhatsAppAdapter(
           ? String((message.id as { id?: string }).id ?? message.id)
           : String(message.id);
 
-      const channelMeta: ChannelMeta = {
-        channel: "whatsapp",
-        chatId,
-        messageId,
-        pushName: (message as { _data?: { notifyName?: string } })._data
-          ?.notifyName,
-        directness,
-        directnessReason,
-      };
+      const mentionedIds = Array.isArray(
+        (message as { mentionedIds?: string[] }).mentionedIds,
+      )
+        ? ((message as { mentionedIds: string[] }).mentionedIds as string[])
+        : [];
+      const selfMentioned =
+        !!selfIdForMeta && mentionedIds.includes(selfIdForMeta);
 
+      let originalMessage: WhatsAppChannelMeta["originalMessage"] = undefined;
       if (message.hasQuotedMsg) {
         try {
           const quoted = await message.getQuotedMessage();
           if (quoted) {
-            channelMeta.originalMessage = {
+            originalMessage = {
               senderId: quoted.author ?? undefined,
               content:
                 typeof quoted.body === "string" ? quoted.body : undefined,
@@ -174,6 +211,24 @@ export async function startWhatsAppAdapter(
           // ignore quoted message errors (e.g. buttons_response type)
         }
       }
+
+      const channelMeta: WhatsAppChannelMeta = {
+        channel: "whatsapp",
+        chatId,
+        messageId,
+        destinationType,
+        directness,
+        directnessReason,
+        ...(mentionedIds.length > 0 ? { mentionedIds } : {}),
+        ...(selfMentioned ? { selfMentioned: true } : {}),
+        ...((message as { _data?: { notifyName?: string } })._data?.notifyName
+          ? {
+              pushName: (message as { _data?: { notifyName?: string } })._data
+                ?.notifyName,
+            }
+          : {}),
+        ...(originalMessage ? { originalMessage } : {}),
+      };
 
       const userId = `whatsapp:${chatId}`;
       debug("New message received from %s", chatId);

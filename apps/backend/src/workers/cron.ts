@@ -20,6 +20,7 @@ import {
   closeReloadWatch,
 } from "../lib/schedule/reload-flag.js";
 import { runEmailPoll } from "../lib/channels/email-adapter.js";
+import { runJiraPoll } from "../lib/channels/jira-adapter.js";
 import { env } from "../env.js";
 import { WORKSPACE_ROOT } from "../lib/core/workspace.js";
 
@@ -87,6 +88,7 @@ function runCronScheduler(
 }
 
 const EMAIL_JOB_ID = "email-poll";
+const JIRA_JOB_ID = "jira-poll";
 
 function runEmailJob(client: ReturnType<typeof createDispatchClient>): {
   start: () => void;
@@ -132,6 +134,51 @@ function runEmailJob(client: ReturnType<typeof createDispatchClient>): {
   return { start, stop };
 }
 
+function runJiraJob(client: ReturnType<typeof createDispatchClient>): {
+  start: () => void;
+  stop: () => void;
+} {
+  let job: ReturnType<typeof schedule.scheduleJob> | null = null;
+
+  function stop(): void {
+    if (job) {
+      job.cancel();
+      job = null;
+      debug("Jira poll job stopped");
+    }
+  }
+
+  function start(): void {
+    stop();
+    const config = getChannelsConfig().jira;
+    if (
+      !config?.enabled ||
+      !config.baseUrl?.trim() ||
+      !config.email?.trim() ||
+      !config.apiToken?.trim()
+    ) {
+      if (config?.enabled)
+        debug(
+          "Jira channel enabled but baseUrl/email/apiToken missing; poll not started",
+        );
+      return;
+    }
+    void runJiraPoll(client, config);
+    const intervalMs = Math.max(60_000, config.pollIntervalMs ?? 300_000);
+    const intervalMinutes = intervalMs / 60_000;
+    const cron = `0 */${Math.max(1, Math.floor(intervalMinutes))} * * * *`;
+    job = schedule.scheduleJob(JIRA_JOB_ID, cron, () => {
+      void runJiraPoll(client, getChannelsConfig().jira);
+    });
+    debug(
+      "Jira channel on; polling every %s min (next at minute 0)",
+      intervalMinutes,
+    );
+  }
+
+  return { start, stop };
+}
+
 async function main() {
   await loadPersisted();
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
@@ -150,23 +197,26 @@ async function main() {
 
   initRedis(env.REDIS_URL);
   const emailJob = runEmailJob(client);
+  const jiraJob = runJiraJob(client);
   emailJob.start();
+  jiraJob.start();
 
   async function onReload(): Promise<void> {
-    debug("Reload flag received; reloading scheduled tasks and email job");
+    debug("Reload flag received; reloading scheduled tasks and channel polls");
     await scheduler.reload();
     emailJob.start();
+    jiraJob.start();
   }
 
   if (env.REDIS_URL) {
-    initReloadWatch(env.REDIS_URL, ["schedule", "email"], onReload);
+    initReloadWatch(env.REDIS_URL, ["schedule", "email", "jira"], onReload);
     debug(
-      "Cron worker started; dispatching to %s; email poll + scheduled tasks; watching Redis reload flag",
+      "Cron worker started; dispatching to %s; email + Jira poll + scheduled tasks; watching Redis reload flag",
       env.API_BASE_URL,
     );
   } else {
     debug(
-      "Cron worker started; dispatching to %s; email poll + scheduled tasks (no Redis, no reload watch)",
+      "Cron worker started; dispatching to %s; email + Jira poll + scheduled tasks (no Redis, no reload watch)",
       env.API_BASE_URL,
     );
   }
@@ -175,6 +225,7 @@ async function main() {
     await closeReloadWatch();
     scheduler.stop();
     emailJob.stop();
+    jiraJob.stop();
     await closeRedis();
     debug("Cron worker stopped.");
     process.exit(0);

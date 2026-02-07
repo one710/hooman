@@ -5,7 +5,7 @@
 import createDebug from "debug";
 import type {
   EventDispatcher,
-  ChannelMeta,
+  SlackChannelMeta,
   SlackChannelConfig,
 } from "../core/types.js";
 
@@ -59,12 +59,29 @@ export async function startSlackAdapter(
     }
   }
 
+  /** Extract Slack user IDs mentioned in text (<@U123>). */
+  function extractMentionedIds(text: string): string[] {
+    const ids: string[] = [];
+    const re = /<@([A-Z0-9]+)>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const id = m[1];
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }
+
   app.message(async ({ message, client }) => {
     if (
       message.subtype === "bot_message" ||
       (message as { bot_id?: string }).bot_id
-    )
+    ) {
+      debug(
+        "Ignoring Slack message from self (bot), not queuing: channel=%s",
+        (message as { channel?: string }).channel,
+      );
       return;
+    }
     const text =
       typeof (message as { text?: string }).text === "string"
         ? (message as { text: string }).text
@@ -75,6 +92,15 @@ export async function startSlackAdapter(
     const messageTs = (message as { ts: string }).ts;
     const threadTs = (message as { thread_ts?: string }).thread_ts;
     const userIdFromSlack = (message as { user?: string }).user ?? "";
+
+    if (designatedUserId && userIdFromSlack === designatedUserId) {
+      debug(
+        "Ignoring Slack message from self (designated user), not queuing: channel=%s user=%s",
+        channelId,
+        userIdFromSlack,
+      );
+      return;
+    }
 
     const isDm = channelId.startsWith("D");
     if (!applyFilter(config, channelId, userIdFromSlack, isDm)) {
@@ -90,6 +116,9 @@ export async function startSlackAdapter(
       ? `slack:${channelId}:${threadTs}`
       : `slack:${channelId}`;
 
+    const mentionedIds = extractMentionedIds(text);
+    const selfMentioned =
+      !!designatedUserId && mentionedIds.includes(designatedUserId);
     const isDirect =
       isDm ||
       (typeof (message as { text?: string }).text === "string" &&
@@ -104,6 +133,12 @@ export async function startSlackAdapter(
           ? "group_message"
           : "channel_message";
 
+    const destinationType = isDm
+      ? "dm"
+      : channelId.startsWith("G")
+        ? "group"
+        : "channel";
+
     let senderName: string | undefined;
     try {
       const u = await client.users.info({ user: userIdFromSlack });
@@ -112,7 +147,7 @@ export async function startSlackAdapter(
       // ignore
     }
 
-    let originalMessage: ChannelMeta["originalMessage"] | undefined;
+    let originalMessage: SlackChannelMeta["originalMessage"];
     if (threadTs && threadTs !== messageTs) {
       try {
         const thread = await client.conversations.history({
@@ -145,15 +180,18 @@ export async function startSlackAdapter(
       }
     }
 
-    const channelMeta: ChannelMeta = {
+    const channelMeta: SlackChannelMeta = {
       channel: "slack",
       channelId,
-      ...(threadTs ? { threadTs } : {}),
       messageTs,
       senderId: userIdFromSlack,
-      ...(senderName ? { senderName } : {}),
+      destinationType,
       directness,
       directnessReason,
+      ...(threadTs ? { threadTs } : {}),
+      ...(senderName ? { senderName } : {}),
+      ...(mentionedIds.length > 0 ? { mentionedIds } : {}),
+      ...(selfMentioned ? { selfMentioned: true } : {}),
       ...(originalMessage ? { originalMessage } : {}),
     };
 

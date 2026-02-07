@@ -27,7 +27,7 @@ async function runWhatsAppAdapter(
 ): Promise<void> {
   await stopWhatsAppAdapter();
   await startWhatsAppAdapter(client, () => getChannelsConfig().whatsapp, {
-    onConnectionUpdate: async ({ status, qr }) => {
+    onConnectionUpdate: async ({ status, qr, selfId, selfNumber }) => {
       try {
         const res = await fetch(connectionStatusUrl(), {
           method: "POST",
@@ -37,7 +37,7 @@ async function runWhatsAppAdapter(
               ? { "X-Internal-Secret": env.INTERNAL_SECRET }
               : {}),
           },
-          body: JSON.stringify({ status, qr }),
+          body: JSON.stringify({ status, qr, selfId, selfNumber }),
         });
         if (!res.ok) {
           debug(
@@ -48,7 +48,10 @@ async function runWhatsAppAdapter(
         } else if (status === "pairing" && qr) {
           debug("QR sent to API for Settings UI");
         } else if (status === "connected") {
-          debug("Linked; connection open");
+          debug(
+            "Linked; connection open (self: %s)",
+            selfNumber ?? selfId ?? "—",
+          );
         }
       } catch (e) {
         const err = e as NodeJS.ErrnoException & { cause?: { code?: string } };

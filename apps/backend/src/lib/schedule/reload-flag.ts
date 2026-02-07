@@ -5,7 +5,7 @@
  */
 import { initRedis, getRedis } from "../data/redis.js";
 
-export type ReloadScope = "schedule" | "slack" | "whatsapp" | "email";
+export type ReloadScope = "schedule" | "slack" | "whatsapp" | "email" | "jira";
 
 const REDIS_KEY_PREFIX = "hooman:workers:reload:";
 const POLL_MS = 2000;
