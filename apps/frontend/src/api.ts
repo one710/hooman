@@ -259,8 +259,11 @@ export type LLMProviderId =
   | "mistral"
   | "deepseek";
 
+export type TranscriptionProviderId = "openai" | "azure" | "deepgram";
+
 export interface AppConfig {
   LLM_PROVIDER?: LLMProviderId;
+  TRANSCRIPTION_PROVIDER?: TranscriptionProviderId;
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
   OPENAI_EMBEDDING_MODEL: string;
@@ -272,6 +275,9 @@ export interface AppConfig {
   AZURE_RESOURCE_NAME?: string;
   AZURE_API_KEY?: string;
   AZURE_API_VERSION?: string;
+  AZURE_TRANSCRIPTION_DEPLOYMENT?: string;
+  DEEPGRAM_API_KEY?: string;
+  DEEPGRAM_TRANSCRIPTION_MODEL?: string;
   ANTHROPIC_API_KEY?: string;
   AWS_REGION?: string;
   AWS_ACCESS_KEY_ID?: string;

@@ -111,8 +111,14 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
   // Chat handler: message.sent → run agents; for api source call deliverApiResult when set
   eventRouter.register(async (event) => {
     if (event.payload.kind !== "message") return;
-    const { text, userId, attachments, attachment_ids, channelMeta } =
-      event.payload;
+    const {
+      text,
+      userId,
+      attachments,
+      attachment_ids,
+      channelMeta,
+      sourceMessageType,
+    } = event.payload;
     const textPreview = text.length > 100 ? `${text.slice(0, 100)}…` : text;
     await auditLog.appendAuditEntry({
       type: "incoming_message",
@@ -122,9 +128,15 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         textPreview,
         channel: (channelMeta as { channel?: string } | undefined)?.channel,
         eventId: event.id,
+        ...(sourceMessageType ? { sourceMessageType } : {}),
       },
     });
-    const sourceLabel = event.source === "api" ? "ui" : event.source;
+    const sourceLabel =
+      event.source === "api"
+        ? "ui"
+        : sourceMessageType === "audio"
+          ? `${event.source} (voice)`
+          : event.source;
     await context.addToMemory(
       [{ role: "user", content: `[${sourceLabel}] ${text}` }],
       { userId, metadata: { source: event.source } },

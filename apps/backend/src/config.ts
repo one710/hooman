@@ -96,9 +96,14 @@ export type LLMProviderId =
   | "mistral"
   | "deepseek";
 
+/** Transcription provider identifier (separate from LLM provider). */
+export type TranscriptionProviderId = "openai" | "azure" | "deepgram";
+
 /** Settings UI / persisted config (API key, embedding model, LLM model, web search, MCP, transcription, agent). */
 export interface PersistedConfig {
   LLM_PROVIDER: LLMProviderId;
+  /** Transcription provider (for audio/voice message transcription). */
+  TRANSCRIPTION_PROVIDER: TranscriptionProviderId;
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
   OPENAI_EMBEDDING_MODEL: string;
@@ -111,6 +116,11 @@ export interface PersistedConfig {
   AZURE_RESOURCE_NAME: string;
   AZURE_API_KEY: string;
   AZURE_API_VERSION: string;
+  /** Azure transcription deployment name (when TRANSCRIPTION_PROVIDER === 'azure'). */
+  AZURE_TRANSCRIPTION_DEPLOYMENT: string;
+  /** Deepgram (when TRANSCRIPTION_PROVIDER === 'deepgram'). */
+  DEEPGRAM_API_KEY: string;
+  DEEPGRAM_TRANSCRIPTION_MODEL: string;
   /** Anthropic */
   ANTHROPIC_API_KEY: string;
   /** Amazon Bedrock */
@@ -137,6 +147,7 @@ export interface AppConfig extends PersistedConfig {
 
 const DEFAULTS: PersistedConfig = {
   LLM_PROVIDER: "openai",
+  TRANSCRIPTION_PROVIDER: "openai",
   OPENAI_API_KEY: "",
   OPENAI_MODEL: "gpt-5.2",
   OPENAI_EMBEDDING_MODEL: "text-embedding-3-small",
@@ -148,6 +159,9 @@ const DEFAULTS: PersistedConfig = {
   AZURE_RESOURCE_NAME: "",
   AZURE_API_KEY: "",
   AZURE_API_VERSION: "",
+  AZURE_TRANSCRIPTION_DEPLOYMENT: "whisper-1",
+  DEEPGRAM_API_KEY: "",
+  DEEPGRAM_TRANSCRIPTION_MODEL: "nova-2",
   ANTHROPIC_API_KEY: "",
   AWS_REGION: "",
   AWS_ACCESS_KEY_ID: "",
@@ -183,9 +197,27 @@ function isLLMProviderId(v: unknown): v is LLMProviderId {
   return typeof v === "string" && LLM_PROVIDER_IDS.includes(v as LLMProviderId);
 }
 
+const TRANSCRIPTION_PROVIDER_IDS: TranscriptionProviderId[] = [
+  "openai",
+  "azure",
+  "deepgram",
+];
+
+function isTranscriptionProviderId(v: unknown): v is TranscriptionProviderId {
+  return (
+    typeof v === "string" &&
+    TRANSCRIPTION_PROVIDER_IDS.includes(v as TranscriptionProviderId)
+  );
+}
+
 export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
   if (patch.LLM_PROVIDER !== undefined && isLLMProviderId(patch.LLM_PROVIDER))
     store.LLM_PROVIDER = patch.LLM_PROVIDER;
+  if (
+    patch.TRANSCRIPTION_PROVIDER !== undefined &&
+    isTranscriptionProviderId(patch.TRANSCRIPTION_PROVIDER)
+  )
+    store.TRANSCRIPTION_PROVIDER = patch.TRANSCRIPTION_PROVIDER;
   if (patch.OPENAI_API_KEY !== undefined)
     store.OPENAI_API_KEY = String(patch.OPENAI_API_KEY);
   if (patch.OPENAI_MODEL !== undefined)
@@ -214,6 +246,16 @@ export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
     store.AZURE_API_KEY = String(patch.AZURE_API_KEY);
   if (patch.AZURE_API_VERSION !== undefined)
     store.AZURE_API_VERSION = String(patch.AZURE_API_VERSION);
+  if (patch.AZURE_TRANSCRIPTION_DEPLOYMENT !== undefined)
+    store.AZURE_TRANSCRIPTION_DEPLOYMENT =
+      String(patch.AZURE_TRANSCRIPTION_DEPLOYMENT).trim() ||
+      DEFAULTS.AZURE_TRANSCRIPTION_DEPLOYMENT;
+  if (patch.DEEPGRAM_API_KEY !== undefined)
+    store.DEEPGRAM_API_KEY = String(patch.DEEPGRAM_API_KEY);
+  if (patch.DEEPGRAM_TRANSCRIPTION_MODEL !== undefined)
+    store.DEEPGRAM_TRANSCRIPTION_MODEL =
+      String(patch.DEEPGRAM_TRANSCRIPTION_MODEL).trim() ||
+      DEFAULTS.DEEPGRAM_TRANSCRIPTION_MODEL;
   if (patch.ANTHROPIC_API_KEY !== undefined)
     store.ANTHROPIC_API_KEY = String(patch.ANTHROPIC_API_KEY);
   if (patch.AWS_REGION !== undefined)
@@ -303,12 +345,27 @@ export async function loadPersisted(): Promise<void> {
         isLLMProviderId(parsed.LLM_PROVIDER)
       )
         store.LLM_PROVIDER = parsed.LLM_PROVIDER;
+      if (
+        parsed.TRANSCRIPTION_PROVIDER !== undefined &&
+        isTranscriptionProviderId(parsed.TRANSCRIPTION_PROVIDER)
+      )
+        store.TRANSCRIPTION_PROVIDER = parsed.TRANSCRIPTION_PROVIDER;
       if (parsed.AZURE_RESOURCE_NAME !== undefined)
         store.AZURE_RESOURCE_NAME = String(parsed.AZURE_RESOURCE_NAME);
       if (parsed.AZURE_API_KEY !== undefined)
         store.AZURE_API_KEY = String(parsed.AZURE_API_KEY);
       if (parsed.AZURE_API_VERSION !== undefined)
         store.AZURE_API_VERSION = String(parsed.AZURE_API_VERSION);
+      if (parsed.AZURE_TRANSCRIPTION_DEPLOYMENT !== undefined)
+        store.AZURE_TRANSCRIPTION_DEPLOYMENT =
+          String(parsed.AZURE_TRANSCRIPTION_DEPLOYMENT).trim() ||
+          DEFAULTS.AZURE_TRANSCRIPTION_DEPLOYMENT;
+      if (parsed.DEEPGRAM_API_KEY !== undefined)
+        store.DEEPGRAM_API_KEY = String(parsed.DEEPGRAM_API_KEY);
+      if (parsed.DEEPGRAM_TRANSCRIPTION_MODEL !== undefined)
+        store.DEEPGRAM_TRANSCRIPTION_MODEL =
+          String(parsed.DEEPGRAM_TRANSCRIPTION_MODEL).trim() ||
+          DEFAULTS.DEEPGRAM_TRANSCRIPTION_MODEL;
       if (parsed.ANTHROPIC_API_KEY !== undefined)
         store.ANTHROPIC_API_KEY = String(parsed.ANTHROPIC_API_KEY);
       if (parsed.AWS_REGION !== undefined)

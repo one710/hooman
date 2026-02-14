@@ -1,6 +1,7 @@
 /**
  * Slack channel adapter: Socket Mode, listens for messages in DMs/channels/groups
  * where the app is present, dispatches message.sent with channelMeta. Inbound only.
+ * Handles text messages only.
  */
 import createDebug from "debug";
 import type {
@@ -83,7 +84,6 @@ export async function startSlackAdapter(
       typeof (message as { text?: string }).text === "string"
         ? (message as { text: string }).text
         : "";
-    if (!text.trim()) return;
 
     const channelId = (message as { channel: string }).channel;
     const messageTs = (message as { ts: string }).ts;
@@ -108,6 +108,8 @@ export async function startSlackAdapter(
       );
       return;
     }
+
+    if (!text.trim()) return;
 
     const userId = threadTs
       ? `slack:${channelId}:${threadTs}`

@@ -31,6 +31,14 @@
     "@ai-sdk/provider" "3.0.8"
     "@ai-sdk/provider-utils" "4.0.15"
 
+"@ai-sdk/deepgram@^2.0.20":
+  version "2.0.20"
+  resolved "https://registry.yarnpkg.com/@ai-sdk/deepgram/-/deepgram-2.0.20.tgz#dedcf656c1e5556b376d6a0d12aa730d81588d8b"
+  integrity sha512-eCRwZt5LgpdbWJAMsBKxbIG0XsE0mhiziIGTCVBU3ZlhKEYozidoRkpgTirr7bmy8Qvj+4SvcKyel35M5vuliQ==
+  dependencies:
+    "@ai-sdk/provider" "3.0.8"
+    "@ai-sdk/provider-utils" "4.0.15"
+
 "@ai-sdk/deepseek@^2.0.20":
   version "2.0.20"
   resolved "https://registry.yarnpkg.com/@ai-sdk/deepseek/-/deepseek-2.0.20.tgz#8707c4cbe42556dea55d4b9fad39c83570f8a020"
@@ -38,6 +46,15 @@
   dependencies:
     "@ai-sdk/provider" "3.0.8"
     "@ai-sdk/provider-utils" "4.0.15"
+
+"@ai-sdk/gateway@3.0.46":
+  version "3.0.46"
+  resolved "https://registry.yarnpkg.com/@ai-sdk/gateway/-/gateway-3.0.46.tgz#e329bebbf66cfc16f2a5c616a40d45e9232a2d72"
+  integrity sha512-zH1UbNRjG5woOXXFOrVCZraqZuFTtmPvLardMGcgLkzpxKV0U3tAGoyWKSZ862H+eBJfI/Hf2yj/zzGJcCkycg==
+  dependencies:
+    "@ai-sdk/provider" "3.0.8"
+    "@ai-sdk/provider-utils" "4.0.15"
+    "@vercel/oidc" "3.1.0"
 
 "@ai-sdk/google-vertex@^4.0.58":
   version "4.0.58"
@@ -832,6 +849,11 @@
     "@openai/agents-realtime" "0.4.5"
     debug "^4.4.0"
     openai "^6"
+
+"@opentelemetry/api@1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@opentelemetry/api/-/api-1.9.0.tgz#d03eba68273dc0f7509e2a3d5cba21eae10379fe"
+  integrity sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==
 
 "@pedroslopez/moduleraid@^5.0.2":
   version "5.0.2"
@@ -1672,6 +1694,11 @@
   resolved "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.3.0.tgz"
   integrity sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==
 
+"@vercel/oidc@3.1.0":
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/@vercel/oidc/-/oidc-3.1.0.tgz#066caee449b84079f33c7445fc862464fe10ec32"
+  integrity sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w==
+
 "@vitejs/plugin-react@^5.1.3":
   version "5.1.3"
   resolved "https://registry.npmjs.org/@vitejs/plugin-react/-/plugin-react-5.1.3.tgz"
@@ -1752,6 +1779,16 @@ aggregate-error@^3.0.0:
   dependencies:
     clean-stack "^2.0.0"
     indent-string "^4.0.0"
+
+ai@^6.0.86:
+  version "6.0.86"
+  resolved "https://registry.yarnpkg.com/ai/-/ai-6.0.86.tgz#cee563e8a0d9b87f8fdda764f190e7dd3f81ba00"
+  integrity sha512-U2W2LBCHA/pr0Ui7vmmsjBiLEzBbZF3yVHNy7Rbzn7IX+SvoQPFM5rN74hhfVzZoE8zBuGD4nLLk+j0elGacvQ==
+  dependencies:
+    "@ai-sdk/gateway" "3.0.46"
+    "@ai-sdk/provider" "3.0.8"
+    "@ai-sdk/provider-utils" "4.0.15"
+    "@opentelemetry/api" "1.9.0"
 
 ajv-formats@^3.0.1:
   version "3.0.1"
@@ -2828,7 +2865,7 @@ depd@^2.0.0, depd@~2.0.0:
 
 dequal@^2.0.0:
   version "2.0.3"
-  resolved "https://registry.npmjs.org/dequal/-/dequal-2.0.3.tgz"
+  resolved "https://registry.yarnpkg.com/dequal/-/dequal-2.0.3.tgz#2644214f1997d39ed0ee0ece72335490a7ac67be"
   integrity sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==
 
 detect-libc@^2.0.0, detect-libc@^2.0.1:
@@ -5216,7 +5253,7 @@ mz@^2.7.0:
 
 nanoid@^3.3.11:
   version "3.3.11"
-  resolved "https://registry.npmjs.org/nanoid/-/nanoid-3.3.11.tgz"
+  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.11.tgz#4f4f112cefbe303202f2199838128936266d185b"
   integrity sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==
 
 napi-build-utils@^2.0.0:

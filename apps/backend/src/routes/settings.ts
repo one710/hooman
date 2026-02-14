@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import createDebug from "debug";
 import type { AppContext } from "./helpers.js";
-import type { LLMProviderId } from "../config.js";
+import type { LLMProviderId, TranscriptionProviderId } from "../config.js";
 import { getConfig, updateConfig } from "../config.js";
 import {
   getKillSwitchEnabled,
@@ -15,6 +15,7 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
     const c = getConfig();
     res.json({
       LLM_PROVIDER: c.LLM_PROVIDER,
+      TRANSCRIPTION_PROVIDER: c.TRANSCRIPTION_PROVIDER,
       OPENAI_API_KEY: c.OPENAI_API_KEY,
       OPENAI_MODEL: c.OPENAI_MODEL,
       OPENAI_EMBEDDING_MODEL: c.OPENAI_EMBEDDING_MODEL,
@@ -26,6 +27,9 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
       AZURE_RESOURCE_NAME: c.AZURE_RESOURCE_NAME,
       AZURE_API_KEY: c.AZURE_API_KEY,
       AZURE_API_VERSION: c.AZURE_API_VERSION,
+      AZURE_TRANSCRIPTION_DEPLOYMENT: c.AZURE_TRANSCRIPTION_DEPLOYMENT,
+      DEEPGRAM_API_KEY: c.DEEPGRAM_API_KEY,
+      DEEPGRAM_TRANSCRIPTION_MODEL: c.DEEPGRAM_TRANSCRIPTION_MODEL,
       ANTHROPIC_API_KEY: c.ANTHROPIC_API_KEY,
       AWS_REGION: c.AWS_REGION,
       AWS_ACCESS_KEY_ID: c.AWS_ACCESS_KEY_ID,
@@ -48,6 +52,9 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
     }
     const updated = updateConfig({
       LLM_PROVIDER: patch.LLM_PROVIDER as LLMProviderId | undefined,
+      TRANSCRIPTION_PROVIDER: patch.TRANSCRIPTION_PROVIDER as
+        | TranscriptionProviderId
+        | undefined,
       OPENAI_API_KEY: patch.OPENAI_API_KEY as string | undefined,
       OPENAI_MODEL: patch.OPENAI_MODEL as string | undefined,
       OPENAI_EMBEDDING_MODEL: patch.OPENAI_EMBEDDING_MODEL as
@@ -65,6 +72,13 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
       AZURE_RESOURCE_NAME: patch.AZURE_RESOURCE_NAME as string | undefined,
       AZURE_API_KEY: patch.AZURE_API_KEY as string | undefined,
       AZURE_API_VERSION: patch.AZURE_API_VERSION as string | undefined,
+      AZURE_TRANSCRIPTION_DEPLOYMENT: patch.AZURE_TRANSCRIPTION_DEPLOYMENT as
+        | string
+        | undefined,
+      DEEPGRAM_API_KEY: patch.DEEPGRAM_API_KEY as string | undefined,
+      DEEPGRAM_TRANSCRIPTION_MODEL: patch.DEEPGRAM_TRANSCRIPTION_MODEL as
+        | string
+        | undefined,
       ANTHROPIC_API_KEY: patch.ANTHROPIC_API_KEY as string | undefined,
       AWS_REGION: patch.AWS_REGION as string | undefined,
       AWS_ACCESS_KEY_ID: patch.AWS_ACCESS_KEY_ID as string | undefined,

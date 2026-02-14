@@ -1,6 +1,7 @@
 /**
  * WhatsApp channel adapter: whatsapp-web.js (Puppeteer-backed), listens for incoming
  * messages, dispatches message.sent with channelMeta. Inbound only.
+ * Handles text messages and voice notes (PTT); transcribes voice and dispatches with sourceMessageType: 'audio'.
  */
 import createDebug from "debug";
 import { join } from "path";
@@ -11,6 +12,7 @@ import type {
 } from "../types.js";
 import { WORKSPACE_ROOT } from "../workspace.js";
 import { env } from "../env.js";
+import { transcribeAudio } from "../lib/transcription.js";
 import wweb from "whatsapp-web.js";
 
 const { Client, LocalAuth } = wweb;
@@ -169,13 +171,80 @@ export async function startWhatsAppAdapter(
       }
 
       const text = typeof message.body === "string" ? message.body.trim() : "";
-      if (!text) return;
-
       const chatId = message.from;
       if (!applyWhatsAppFilter(cfg, chatId)) {
         debug("WhatsApp message filtered out: chatId=%s", chatId);
         return;
       }
+
+      // Voice note (PTT): no text, transcribe and dispatch with sourceMessageType: 'audio'
+      const messageType = (message as { type?: string }).type;
+      if (!text && messageType === "ptt" && message.hasMedia) {
+        try {
+          const media = await message.downloadMedia();
+          if (!media?.data) {
+            debug("WhatsApp voice note: no media data");
+            return;
+          }
+          const buffer = Buffer.from(media.data, "base64");
+          const transcribedText = (
+            await transcribeAudio(buffer, { mimeType: media.mimetype })
+          ).trim();
+          if (!transcribedText) {
+            debug("WhatsApp voice transcription returned empty text");
+            return;
+          }
+          const isDirect = chatId.endsWith("@c.us");
+          const destinationType = isDirect ? "dm" : "group";
+          const directness: "direct" | "neutral" = isDirect
+            ? "direct"
+            : "neutral";
+          const directnessReason = isDirect ? "dm" : "group";
+          const messageId =
+            typeof message.id === "object" && message.id && "id" in message.id
+              ? String((message.id as { id?: string }).id ?? message.id)
+              : String(message.id);
+          const channelMeta: WhatsAppChannelMeta = {
+            channel: "whatsapp",
+            chatId,
+            messageId,
+            destinationType,
+            directness,
+            directnessReason,
+            ...((message as { _data?: { notifyName?: string } })._data
+              ?.notifyName
+              ? {
+                  pushName: (message as { _data?: { notifyName?: string } })
+                    ._data?.notifyName,
+                }
+              : {}),
+          };
+          const userId = `whatsapp:${chatId}`;
+          await dispatcher.dispatch(
+            {
+              source: "whatsapp",
+              type: "message.sent",
+              payload: {
+                text: transcribedText,
+                userId,
+                channelMeta,
+                sourceMessageType: "audio" as const,
+              },
+            },
+            {},
+          );
+          debug(
+            "WhatsApp message.sent dispatched (voice): chatId=%s id=%s",
+            chatId,
+            messageId,
+          );
+        } catch (err) {
+          debug("WhatsApp voice transcription failed: %o", err);
+        }
+        return;
+      }
+
+      if (!text) return;
 
       const isDirect = chatId.endsWith("@c.us");
       const destinationType = isDirect ? "dm" : "group";

@@ -70,6 +70,8 @@ function normalizePayload(
         (payload.channelMeta as ChannelMeta).directness === "neutral")
         ? (payload.channelMeta as ChannelMeta)
         : undefined;
+    const sourceMessageType =
+      payload.sourceMessageType === "audio" ? ("audio" as const) : undefined;
     return {
       kind: "message",
       text,
@@ -77,6 +79,7 @@ function normalizePayload(
       attachments,
       attachment_ids,
       ...(channelMeta ? { channelMeta } : {}),
+      ...(sourceMessageType ? { sourceMessageType } : {}),
     };
   }
   if (type === "task.scheduled") {

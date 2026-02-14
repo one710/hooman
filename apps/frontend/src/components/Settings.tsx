@@ -4,6 +4,7 @@ import {
   saveConfig,
   type AppConfig,
   type LLMProviderId,
+  type TranscriptionProviderId,
 } from "../api";
 import { Checkbox } from "./Checkbox";
 import { Button } from "./Button";
@@ -22,6 +23,15 @@ const LLM_PROVIDER_OPTIONS: { value: LLMProviderId; label: string }[] = [
   { value: "google-vertex", label: "Google Vertex" },
   { value: "mistral", label: "Mistral" },
   { value: "deepseek", label: "DeepSeek" },
+];
+
+const TRANSCRIPTION_PROVIDER_OPTIONS: {
+  value: TranscriptionProviderId;
+  label: string;
+}[] = [
+  { value: "openai", label: "OpenAI" },
+  { value: "azure", label: "Azure OpenAI" },
+  { value: "deepgram", label: "Deepgram" },
 ];
 
 export function Settings() {
@@ -48,6 +58,7 @@ export function Settings() {
     try {
       const updated = await saveConfig({
         LLM_PROVIDER: form.LLM_PROVIDER ?? "openai",
+        TRANSCRIPTION_PROVIDER: form.TRANSCRIPTION_PROVIDER ?? "openai",
         OPENAI_API_KEY: form.OPENAI_API_KEY,
         OPENAI_MODEL: form.OPENAI_MODEL,
         OPENAI_EMBEDDING_MODEL: form.OPENAI_EMBEDDING_MODEL,
@@ -59,6 +70,9 @@ export function Settings() {
         AZURE_RESOURCE_NAME: form.AZURE_RESOURCE_NAME,
         AZURE_API_KEY: form.AZURE_API_KEY,
         AZURE_API_VERSION: form.AZURE_API_VERSION,
+        AZURE_TRANSCRIPTION_DEPLOYMENT: form.AZURE_TRANSCRIPTION_DEPLOYMENT,
+        DEEPGRAM_API_KEY: form.DEEPGRAM_API_KEY,
+        DEEPGRAM_TRANSCRIPTION_MODEL: form.DEEPGRAM_TRANSCRIPTION_MODEL,
         ANTHROPIC_API_KEY: form.ANTHROPIC_API_KEY,
         AWS_REGION: form.AWS_REGION,
         AWS_ACCESS_KEY_ID: form.AWS_ACCESS_KEY_ID,
@@ -153,48 +167,147 @@ export function Settings() {
             </div>
           </div>
           <div className="pt-4 border-t border-hooman-border">
-            <h3 className="text-sm font-medium text-zinc-300 mb-2">LLM</h3>
-            <div className="space-y-3">
-              <Select<LLMProviderId>
-                label="Provider"
-                value={form.LLM_PROVIDER ?? "openai"}
-                options={LLM_PROVIDER_OPTIONS}
-                onChange={(value) =>
-                  setForm((f) => (f ? { ...f, LLM_PROVIDER: value } : f))
-                }
-              />
-              <p className="text-xs text-hooman-muted">
-                Embedding and voice use OpenAI settings when configured.
-              </p>
-            </div>
-            {(form.LLM_PROVIDER ?? "openai") === "openai" && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  API key
-                </label>
-                <Input
-                  type="password"
-                  value={form.OPENAI_API_KEY}
-                  onChange={(e) =>
-                    setForm((f) =>
-                      f ? { ...f, OPENAI_API_KEY: e.target.value } : f,
-                    )
+            <h3 className="text-sm font-medium text-zinc-300 mb-2">
+              Providers
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Select<LLMProviderId>
+                  label="LLM provider (chat, memory)"
+                  value={form.LLM_PROVIDER ?? "openai"}
+                  options={LLM_PROVIDER_OPTIONS}
+                  onChange={(value) =>
+                    setForm((f) => (f ? { ...f, LLM_PROVIDER: value } : f))
                   }
-                  placeholder="sk-..."
-                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                  autoComplete="off"
                 />
                 <p className="text-xs text-hooman-muted mt-1">
-                  Leave empty for no LLM; the agent will still chat with a
-                  fallback.
+                  Used for chat and Mem0 memory.
                 </p>
               </div>
-            )}
-            {(form.LLM_PROVIDER ?? "openai") === "azure" && (
+              <div>
+                <Select<TranscriptionProviderId>
+                  label="Transcription provider (voice / audio messages)"
+                  value={form.TRANSCRIPTION_PROVIDER ?? "openai"}
+                  options={TRANSCRIPTION_PROVIDER_OPTIONS}
+                  onChange={(value) =>
+                    setForm((f) =>
+                      f ? { ...f, TRANSCRIPTION_PROVIDER: value } : f,
+                    )
+                  }
+                />
+                <p className="text-xs text-hooman-muted mt-1">
+                  Used for Slack voice clips, WhatsApp voice notes, speak
+                  button.
+                </p>
+              </div>
+            </div>
+            {((form.LLM_PROVIDER ?? "openai") === "openai" ||
+              (form.TRANSCRIPTION_PROVIDER ?? "openai") === "openai") && (
               <div className="mt-3 space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Resource name
+                    OpenAI – API key
+                  </label>
+                  <Input
+                    type="password"
+                    value={form.OPENAI_API_KEY}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_API_KEY: e.target.value } : f,
+                      )
+                    }
+                    placeholder="sk-..."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Used for chat when LLM is OpenAI, embeddings, and
+                    transcription when Transcription provider is OpenAI. Leave
+                    empty for no LLM; the agent will still chat with a fallback.
+                  </p>
+                </div>
+                {(form.LLM_PROVIDER ?? "openai") === "openai" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-1">
+                        OpenAI – Chat model
+                      </label>
+                      <Input
+                        type="text"
+                        value={form.OPENAI_MODEL}
+                        onChange={(e) =>
+                          setForm((f) =>
+                            f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                          )
+                        }
+                        placeholder="gpt-5.2, gpt-4o, etc."
+                        className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                      />
+                      <p className="text-xs text-hooman-muted mt-1">
+                        Model ID for chat and Mem0 memory.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-1">
+                        OpenAI – Embedding model
+                      </label>
+                      <Input
+                        type="text"
+                        value={form.OPENAI_EMBEDDING_MODEL}
+                        onChange={(e) =>
+                          setForm((f) =>
+                            f
+                              ? { ...f, OPENAI_EMBEDDING_MODEL: e.target.value }
+                              : f,
+                          )
+                        }
+                        placeholder="text-embedding-3-small"
+                        className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                      />
+                      <p className="text-xs text-hooman-muted mt-1">
+                        Used for Mem0 embeddings only.
+                      </p>
+                    </div>
+                  </>
+                )}
+                {(form.TRANSCRIPTION_PROVIDER ?? "openai") === "openai" && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      OpenAI – Transcription model
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.OPENAI_TRANSCRIPTION_MODEL ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                OPENAI_TRANSCRIPTION_MODEL: e.target.value,
+                              }
+                            : f,
+                        )
+                      }
+                      placeholder="gpt-4o-transcribe"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    />
+                    <p className="text-xs text-hooman-muted mt-1">
+                      e.g. gpt-4o-transcribe, gpt-4o-mini-transcribe, whisper-1.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {((form.LLM_PROVIDER ?? "openai") === "azure" ||
+              (form.TRANSCRIPTION_PROVIDER ?? "openai") === "azure") && (
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-hooman-muted">
+                  Used for chat when LLM is Azure; for transcription when
+                  Transcription provider is Azure.
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Azure – Resource name
                   </label>
                   <Input
                     type="text"
@@ -211,7 +324,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    API key
+                    Azure – API key
                   </label>
                   <Input
                     type="password"
@@ -228,7 +341,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    API version (optional)
+                    Azure – API version (optional)
                   </label>
                   <Input
                     type="text"
@@ -242,32 +355,101 @@ export function Settings() {
                     className="bg-hooman-surface focus:ring-offset-hooman-surface"
                   />
                 </div>
+                {(form.LLM_PROVIDER ?? "openai") === "azure" && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Azure – Chat model (deployment name)
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.OPENAI_MODEL}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                        )
+                      }
+                      placeholder="Deployment name"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    />
+                    <p className="text-xs text-hooman-muted mt-1">
+                      Used for chat and Mem0 memory.
+                    </p>
+                  </div>
+                )}
+                {(form.TRANSCRIPTION_PROVIDER ?? "openai") === "azure" && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Azure – Transcription deployment
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.AZURE_TRANSCRIPTION_DEPLOYMENT ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                AZURE_TRANSCRIPTION_DEPLOYMENT: e.target.value,
+                              }
+                            : f,
+                        )
+                      }
+                      placeholder="whisper-1"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    />
+                    <p className="text-xs text-hooman-muted mt-1">
+                      Deployment name for transcription (e.g. whisper-1,
+                      gpt-4o-transcribe).
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "anthropic" && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  API key
-                </label>
-                <Input
-                  type="password"
-                  value={form.ANTHROPIC_API_KEY ?? ""}
-                  onChange={(e) =>
-                    setForm((f) =>
-                      f ? { ...f, ANTHROPIC_API_KEY: e.target.value } : f,
-                    )
-                  }
-                  placeholder="sk-ant-..."
-                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                  autoComplete="off"
-                />
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Anthropic – API key
+                  </label>
+                  <Input
+                    type="password"
+                    value={form.ANTHROPIC_API_KEY ?? ""}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, ANTHROPIC_API_KEY: e.target.value } : f,
+                      )
+                    }
+                    placeholder="sk-ant-..."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Anthropic – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="claude-3-5-sonnet-20241022, claude-3-opus, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "amazon-bedrock" && (
               <div className="mt-3 space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Region
+                    Amazon Bedrock – Region
                   </label>
                   <Input
                     type="text"
@@ -284,7 +466,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Access key ID
+                    Amazon Bedrock – Access key ID
                   </label>
                   <Input
                     type="text"
@@ -301,7 +483,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Secret access key
+                    Amazon Bedrock – Secret access key
                   </label>
                   <Input
                     type="password"
@@ -318,7 +500,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Session token (optional)
+                    Amazon Bedrock – Session token (optional)
                   </label>
                   <Input
                     type="password"
@@ -333,37 +515,77 @@ export function Settings() {
                     autoComplete="off"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Amazon Bedrock – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="anthropic.claude-3-5-sonnet-v2, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "google" && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  API key
-                </label>
-                <Input
-                  type="password"
-                  value={form.GOOGLE_GENERATIVE_AI_API_KEY ?? ""}
-                  onChange={(e) =>
-                    setForm((f) =>
-                      f
-                        ? {
-                            ...f,
-                            GOOGLE_GENERATIVE_AI_API_KEY: e.target.value,
-                          }
-                        : f,
-                    )
-                  }
-                  placeholder="..."
-                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                  autoComplete="off"
-                />
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Google – API key
+                  </label>
+                  <Input
+                    type="password"
+                    value={form.GOOGLE_GENERATIVE_AI_API_KEY ?? ""}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f
+                          ? {
+                              ...f,
+                              GOOGLE_GENERATIVE_AI_API_KEY: e.target.value,
+                            }
+                          : f,
+                      )
+                    }
+                    placeholder="..."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Google – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="gemini-2.0-flash, gemini-1.5-pro, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "google-vertex" && (
               <div className="mt-3 space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Project
+                    Google Vertex – Project
                   </label>
                   <Input
                     type="text"
@@ -380,7 +602,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Location
+                    Google Vertex – Location
                   </label>
                   <Input
                     type="text"
@@ -399,7 +621,7 @@ export function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    API key (optional, for express mode)
+                    Google Vertex – API key (optional, for express mode)
                   </label>
                   <Input
                     type="password"
@@ -417,110 +639,160 @@ export function Settings() {
                     Or set GOOGLE_APPLICATION_CREDENTIALS for service account.
                   </p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Google Vertex – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="gemini-2.0-flash, gemini-1.5-pro, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "mistral" && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  API key
-                </label>
-                <Input
-                  type="password"
-                  value={form.MISTRAL_API_KEY ?? ""}
-                  onChange={(e) =>
-                    setForm((f) =>
-                      f ? { ...f, MISTRAL_API_KEY: e.target.value } : f,
-                    )
-                  }
-                  placeholder="..."
-                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                  autoComplete="off"
-                />
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Mistral – API key
+                  </label>
+                  <Input
+                    type="password"
+                    value={form.MISTRAL_API_KEY ?? ""}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, MISTRAL_API_KEY: e.target.value } : f,
+                      )
+                    }
+                    placeholder="..."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    Mistral – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="mistral-large-latest, mistral-small, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
             {(form.LLM_PROVIDER ?? "openai") === "deepseek" && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  API key
-                </label>
-                <Input
-                  type="password"
-                  value={form.DEEPSEEK_API_KEY ?? ""}
-                  onChange={(e) =>
-                    setForm((f) =>
-                      f ? { ...f, DEEPSEEK_API_KEY: e.target.value } : f,
-                    )
-                  }
-                  placeholder="..."
-                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                  autoComplete="off"
-                />
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    DeepSeek – API key
+                  </label>
+                  <Input
+                    type="password"
+                    value={form.DEEPSEEK_API_KEY ?? ""}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, DEEPSEEK_API_KEY: e.target.value } : f,
+                      )
+                    }
+                    placeholder="..."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    DeepSeek – Chat model
+                  </label>
+                  <Input
+                    type="text"
+                    value={form.OPENAI_MODEL}
+                    onChange={(e) =>
+                      setForm((f) =>
+                        f ? { ...f, OPENAI_MODEL: e.target.value } : f,
+                      )
+                    }
+                    placeholder="deepseek-chat, deepseek-reasoner, etc."
+                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                  />
+                  <p className="text-xs text-hooman-muted mt-1">
+                    Model ID for chat and Mem0 memory.
+                  </p>
+                </div>
               </div>
             )}
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Chat model
-              </label>
-              <Input
-                type="text"
-                value={form.OPENAI_MODEL}
-                onChange={(e) =>
-                  setForm((f) =>
-                    f ? { ...f, OPENAI_MODEL: e.target.value } : f,
-                  )
-                }
-                placeholder={
-                  (form.LLM_PROVIDER ?? "openai") === "azure"
-                    ? "Deployment name"
-                    : "gpt-5.2, claude-3-haiku-..., gemini-2.5-flash, etc."
-                }
-                className="bg-hooman-surface focus:ring-offset-hooman-surface"
-              />
-              <p className="text-xs text-hooman-muted mt-1">
-                Model ID or deployment name. Used for general chat and for Mem0
-                memory.
-              </p>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              Embedding model
-            </label>
-            <Input
-              type="text"
-              value={form.OPENAI_EMBEDDING_MODEL}
-              onChange={(e) =>
-                setForm((f) =>
-                  f ? { ...f, OPENAI_EMBEDDING_MODEL: e.target.value } : f,
-                )
-              }
-              placeholder="text-embedding-3-small"
-              className="bg-hooman-surface focus:ring-offset-hooman-surface"
-            />
-            <p className="text-xs text-hooman-muted mt-1">
-              Used for Mem0 embeddings only (e.g. text-embedding-3-small,
-              text-embedding-3-large).
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              Voice input (transcription) model
-            </label>
-            <Input
-              type="text"
-              value={form.OPENAI_TRANSCRIPTION_MODEL}
-              onChange={(e) =>
-                setForm((f) =>
-                  f ? { ...f, OPENAI_TRANSCRIPTION_MODEL: e.target.value } : f,
-                )
-              }
-              placeholder="gpt-4o-transcribe"
-              className="bg-hooman-surface focus:ring-offset-hooman-surface"
-            />
-            <p className="text-xs text-hooman-muted mt-1">
-              Realtime transcription for the speak button (e.g.
-              gpt-4o-transcribe, gpt-4o-mini-transcribe, whisper-1).
-            </p>
+            {(form.TRANSCRIPTION_PROVIDER ?? "openai") === "deepgram" && (
+              <div className="mt-3 pt-4 border-t border-hooman-border">
+                <h3 className="text-sm font-medium text-zinc-300 mb-2">
+                  Deepgram
+                </h3>
+                <p className="text-xs text-hooman-muted mb-3">
+                  Used for transcription when Transcription provider is
+                  Deepgram.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Deepgram – API key
+                    </label>
+                    <Input
+                      type="password"
+                      value={form.DEEPGRAM_API_KEY ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f ? { ...f, DEEPGRAM_API_KEY: e.target.value } : f,
+                        )
+                      }
+                      placeholder="Your Deepgram API key"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Deepgram – Model
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.DEEPGRAM_TRANSCRIPTION_MODEL ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                DEEPGRAM_TRANSCRIPTION_MODEL: e.target.value,
+                              }
+                            : f,
+                        )
+                      }
+                      placeholder="nova-2"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                    />
+                    <p className="text-xs text-hooman-muted mt-1">
+                      e.g. nova-3, nova-2, nova, enhanced, base.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <Checkbox
             id="web-search"

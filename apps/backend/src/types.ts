@@ -177,6 +177,8 @@ export interface NormalizedMessagePayload {
   attachment_ids?: string[];
   /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to personas. */
   channelMeta?: ChannelMeta;
+  /** Set when the message text was transcribed from an audio/voice message. */
+  sourceMessageType?: "audio";
 }
 
 export interface NormalizedScheduledTaskPayload {
