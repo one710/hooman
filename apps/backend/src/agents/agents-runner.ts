@@ -1,4 +1,7 @@
 import { Agent, run } from "@openai/agents";
+import createDebug from "debug";
+
+const debug = createDebug("hooman:agents-runner");
 
 /** Simple thread item for building input; we convert to SDK format (content as array) before run(). */
 export type AgentInputItem = { role: "user" | "assistant"; content: string };
@@ -144,6 +147,33 @@ export async function runChat(
     protocolInput as Parameters<typeof run>[1],
     runOptions,
   );
+
+  // Log each tool call for debugging (e.g. to verify get_current_time from _default_time is used).
+  const items = result.newItems ?? [];
+  for (const item of items) {
+    const t = (item as { type?: string }).type;
+    if (
+      t === "tool_call_item" ||
+      t === "tool_call_output_item" ||
+      t === "tool_approval_item"
+    ) {
+      const it = item as {
+        type: string;
+        agent?: { name?: string };
+        rawItem?: { name?: string; content?: { name?: string } };
+        name?: string;
+        toolName?: string;
+      };
+      const toolName =
+        it.toolName ??
+        it.name ??
+        it.rawItem?.name ??
+        it.rawItem?.content?.name ??
+        "(unknown)";
+      const serverOrAgent = it.agent?.name ?? "(main)";
+      debug("MCP tool call: name=%s agent=%s", toolName, serverOrAgent);
+    }
+  }
 
   const finalText =
     typeof result.finalOutput === "string"

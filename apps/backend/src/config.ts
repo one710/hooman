@@ -41,6 +41,10 @@ When the user asks you to message them (or someone) on WhatsApp and gives a phon
 - 44 20 7123 4567 → 442071234567@c.us
 Strip all non-digits from the number, then append @c.us. Use that as chatId in whatsapp_send_message. Do not ask the user to "share the chat ID" or "message first" if they have already provided a phone number.
 
+## Current time and time-critical operations
+
+Before doing any time-critical operation or anything that involves the current date/time (e.g. scheduling, reminders, "in 2 hours", "by tomorrow", interpreting "now" or "today"), use the available time tool to get the current time. Use get_current_time from the _default_time MCP server (or the equivalent time tool if exposed under another name) so your answers and scheduled tasks are based on the actual current time, not guesswork.
+
 Never fabricate tool results. If a tool call fails, report the actual error.`;
 
 /** LLM provider identifier for agent chat model. */

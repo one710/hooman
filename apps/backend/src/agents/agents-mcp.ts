@@ -32,6 +32,8 @@ import {
   DEFAULT_AGENT_INSTRUCTIONS,
   STATIC_AGENT_INSTRUCTIONS_APPEND,
 } from "../config.js";
+import type { ScheduleService } from "../data/scheduler.js";
+import { setReloadFlag } from "../data/reload-flag.js";
 import { env, BACKEND_ROOT } from "../env.js";
 import { join } from "path";
 import createDebug from "debug";
@@ -462,16 +464,147 @@ export function getAgentModel(
   }
 }
 
+/**
+ * Build schedule tools (list, create, cancel) for the main agent when a schedule service is provided.
+ */
+function buildScheduleTools(
+  scheduleService: ScheduleService,
+): ReturnType<typeof tool>[] {
+  const listScheduledTasksTool = tool({
+    name: "list_scheduled_tasks",
+    description:
+      "List all scheduled tasks for the user. Returns each task's id, execute_at (ISO time), intent, and optional context. Use this to see what is already scheduled before creating or canceling tasks.",
+    parameters: {
+      type: "object" as const,
+      properties: {},
+      required: [] as const,
+      additionalProperties: false as const,
+    },
+    strict: true as const,
+    execute: async () => {
+      const tasks = await scheduleService.list();
+      if (tasks.length === 0) return "No scheduled tasks.";
+      return JSON.stringify(
+        tasks.map((t) => ({
+          id: t.id,
+          execute_at: t.execute_at,
+          intent: t.intent,
+          context: t.context,
+        })),
+        null,
+        2,
+      );
+    },
+  });
+
+  const createScheduledTaskTool = tool({
+    name: "create_scheduled_task",
+    description:
+      "Create a new scheduled task. The task will run at execute_at (ISO date-time string, e.g. 2025-02-05T14:00:00Z). intent is a short description of what to do. context is an optional object with extra details. Use this to schedule follow-ups or deferred work for yourself.",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        execute_at: {
+          type: "string" as const,
+          description:
+            "When to run the task (ISO 8601 date-time, e.g. 2025-02-05T14:00:00Z)",
+        },
+        intent: {
+          type: "string" as const,
+          description: "Short description of what the task should do",
+        },
+        context: {
+          type: "object" as const,
+          description: "Optional extra context (key-value object) for the task",
+        },
+      },
+      required: ["execute_at", "intent"] as const,
+      additionalProperties: false as const,
+    },
+    strict: true as const,
+    execute: async (input: unknown) => {
+      const raw = input as {
+        execute_at?: string;
+        intent?: string;
+        context?: Record<string, unknown>;
+      };
+      const execute_at =
+        typeof raw?.execute_at === "string" ? raw.execute_at.trim() : "";
+      const intent = typeof raw?.intent === "string" ? raw.intent.trim() : "";
+      if (!execute_at || !intent) {
+        return "Error: execute_at and intent are required.";
+      }
+      const context =
+        raw?.context &&
+        typeof raw.context === "object" &&
+        !Array.isArray(raw.context)
+          ? (raw.context as Record<string, unknown>)
+          : {};
+      const id = await scheduleService.schedule({
+        execute_at,
+        intent,
+        context,
+      });
+      await setReloadFlag(env.REDIS_URL, "schedule");
+      return `Scheduled task created with id: ${id}. It will run at ${execute_at}.`;
+    },
+  });
+
+  const cancelScheduledTaskTool = tool({
+    name: "cancel_scheduled_task",
+    description:
+      "Cancel a scheduled task by id. Use the id from list_scheduled_tasks. Returns success or that the task was not found.",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        id: {
+          type: "string" as const,
+          description: "The task id to cancel (from list_scheduled_tasks)",
+        },
+      },
+      required: ["id"] as const,
+      additionalProperties: false as const,
+    },
+    strict: true as const,
+    execute: async (input: unknown) => {
+      const id =
+        typeof (input as { id?: string })?.id === "string"
+          ? (input as { id: string }).id.trim()
+          : "";
+      if (!id) return "Error: id is required.";
+      const ok = await scheduleService.cancel(id);
+      if (ok) {
+        await setReloadFlag(env.REDIS_URL, "schedule");
+        return `Scheduled task ${id} has been cancelled.`;
+      }
+      return `Scheduled task with id "${id}" was not found.`;
+    },
+  });
+
+  return [
+    listScheduledTasksTool,
+    createScheduledTaskTool,
+    cancelScheduledTaskTool,
+  ];
+}
+
 export async function createHoomanAgentWithMcp(
   personas: PersonaConfig[],
   connections: MCPConnection[],
-  options?: { apiKey?: string; model?: string },
+  options?: {
+    apiKey?: string;
+    model?: string;
+    scheduleService?: ScheduleService;
+  },
 ): Promise<{
   agent: ReturnType<typeof Agent.create>;
   closeMcp: () => Promise<void>;
 }> {
   const config = getConfig();
   const model = getAgentModel(config, options);
+  const scheduleTools = options?.scheduleService
+    ? buildScheduleTools(options.scheduleService)
+    : [];
 
   const allConnections: MCPConnection[] = [
     ...getAllDefaultMcpConnections(),
@@ -551,14 +684,16 @@ export async function createHoomanAgentWithMcp(
     });
   });
 
-  // Attach channel MCP servers (Slack, WhatsApp, Email) to Hooman so it can reply to the source channel.
+  // Attach default MCP servers (fetch, time, filesystem) and channel MCPs (Slack, WhatsApp, Email) to Hooman.
+  const defaultMcpIds = getPersonaDefaultMcpConnectionIds();
   const channelMcpIds = getChannelMcpConnectionIds();
+  const hoomanMcpIds = [...defaultMcpIds, ...channelMcpIds];
   const hoomanServers: MCPServer[] = [];
-  for (const id of channelMcpIds) {
+  for (const id of hoomanMcpIds) {
     const server = connectionIdToServer.get(id);
     if (server && activeServers.includes(server)) {
       hoomanServers.push(server);
-    } else {
+    } else if (channelMcpIds.includes(id)) {
       debug("Channel MCP '%s' not active (missing or failed to connect)", id);
     }
   }
@@ -566,7 +701,7 @@ export async function createHoomanAgentWithMcp(
     getConfig();
   if (hoomanServers.length > 0) {
     debug(
-      "%s agent gets %d channel MCP server(s): %s",
+      "%s agent gets %d MCP server(s): %s",
       agentName || "Hooman",
       hoomanServers.length,
       hoomanServers.map((s) => s.name).join(", "),
@@ -584,6 +719,7 @@ export async function createHoomanAgentWithMcp(
     model,
     handoffs: personaAgents,
     mcpServers: hoomanServers,
+    tools: scheduleTools,
   });
 
   async function closeMcp(): Promise<void> {

@@ -5,6 +5,7 @@
  * Run as a separate PM2 process (e.g. pm2 start ecosystem.config.cjs --only event-queue).
  */
 import createDebug from "debug";
+import { randomUUID } from "crypto";
 import { mkdirSync } from "fs";
 import {
   addTraceProcessor,
@@ -21,6 +22,7 @@ import { AuditLog } from "../audit.js";
 import { PersonaEngine } from "../agents/personas.js";
 import { createContext } from "../agents/context.js";
 import { initPersonaStore } from "../data/personas-store.js";
+import type { ScheduleService, ScheduledTask } from "../data/scheduler.js";
 import { initScheduleStore } from "../data/schedule-store.js";
 import { initMCPConnectionsStore } from "../data/mcp-connections-store.js";
 import { initDb } from "../data/db.js";
@@ -67,7 +69,16 @@ async function main() {
   const personaEngine = new PersonaEngine(personaStore);
   await personaEngine.load();
   const mcpConnectionsStore = await initMCPConnectionsStore();
-  await initScheduleStore();
+  const scheduleStore = await initScheduleStore();
+  const scheduler: ScheduleService = {
+    list: () => scheduleStore.getAll(),
+    schedule: async (task: Omit<ScheduledTask, "id">) => {
+      const id = randomUUID();
+      await scheduleStore.add({ ...task, id });
+      return id;
+    },
+    cancel: (id) => scheduleStore.remove(id),
+  };
   const auditStore = createAuditStore({
     onAppend: () => publish(AUDIT_ENTRY_ADDED_CHANNEL, "1"),
   });
@@ -89,6 +100,7 @@ async function main() {
     mcpConnectionsStore,
     getConfig,
     auditLog,
+    scheduler,
     deliverApiResult: async (eventId, message) => {
       const res = await fetch(chatResultUrl, {
         method: "POST",

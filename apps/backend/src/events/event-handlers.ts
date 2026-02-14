@@ -7,6 +7,7 @@ import type { EventRouter } from "./event-router.js";
 import type { ContextStore } from "../agents/context.js";
 import type { PersonaEngine } from "../agents/personas.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
+import type { ScheduleService } from "../data/scheduler.js";
 import type { AuditLog } from "../audit.js";
 import { runChat } from "../agents/agents-runner.js";
 import { createHoomanAgentWithMcp } from "../agents/agents-mcp.js";
@@ -68,6 +69,8 @@ export interface EventHandlerDeps {
     AGENT_NAME: string;
   };
   auditLog: AuditLog;
+  /** Schedule service for main agent schedule tools (list/create/cancel). When set, worker passes it so the agent can schedule tasks. */
+  scheduler?: ScheduleService;
   /** When set, called for api-source chat to deliver result (API: resolve pending; worker: POST to API). */
   deliverApiResult?: (
     eventId: string,
@@ -83,6 +86,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     mcpConnectionsStore,
     getConfig,
     auditLog,
+    scheduler,
     deliverApiResult,
   } = deps;
 
@@ -140,6 +144,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       const { agent, closeMcp } = await createHoomanAgentWithMcp(
         personas,
         connections,
+        scheduler ? { scheduleService: scheduler } : undefined,
       );
       try {
         const channelContext = buildChannelContext(
@@ -277,6 +282,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       const { agent, closeMcp } = await createHoomanAgentWithMcp(
         personas,
         connections,
+        scheduler ? { scheduleService: scheduler } : undefined,
       );
       try {
         const { finalOutput, lastAgentName, newItems } = await runChat(
