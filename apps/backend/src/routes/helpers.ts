@@ -3,7 +3,7 @@ import type { Server as SocketServer } from "socket.io";
 import type { EventRouter } from "../events/event-router.js";
 import type { ContextStore } from "../agents/context.js";
 import type { AuditLog } from "../audit.js";
-import type { ColleagueEngine } from "../agents/colleagues.js";
+import type { PersonaEngine } from "../agents/personas.js";
 import type { ScheduleService } from "../data/scheduler.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import type { AttachmentStore } from "../data/attachment-store.js";
@@ -12,7 +12,7 @@ export interface AppContext {
   eventRouter: EventRouter;
   context: ContextStore;
   auditLog: AuditLog;
-  colleagueEngine: ColleagueEngine;
+  personaEngine: PersonaEngine;
   responseStore: Map<
     string,
     Array<{ role: "user" | "assistant"; text: string }>

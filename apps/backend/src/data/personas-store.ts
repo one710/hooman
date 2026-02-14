@@ -1,14 +1,14 @@
 import { getPrisma } from "./db.js";
-import type { ColleagueConfig } from "../types.js";
+import type { PersonaConfig } from "../types.js";
 
-export interface ColleagueStore {
-  getAll(): Promise<ColleagueConfig[]>;
-  getById(id: string): Promise<ColleagueConfig | null>;
-  addOrUpdate(colleague: ColleagueConfig): Promise<void>;
+export interface PersonaStore {
+  getAll(): Promise<PersonaConfig[]>;
+  getById(id: string): Promise<PersonaConfig | null>;
+  addOrUpdate(persona: PersonaConfig): Promise<void>;
   remove(id: string): Promise<boolean>;
 }
 
-function rowToColleague(row: {
+function rowToPersona(row: {
   id: string;
   description: string;
   responsibilities: string;
@@ -16,7 +16,7 @@ function rowToColleague(row: {
   allowed_skills: string;
   memory: string;
   reporting: string;
-}): ColleagueConfig {
+}): PersonaConfig {
   const parseArr = (s: string): string[] => {
     try {
       const a = JSON.parse(s) as unknown;
@@ -60,54 +60,54 @@ function rowToColleague(row: {
   };
 }
 
-export async function initColleagueStore(): Promise<ColleagueStore> {
+export async function initPersonaStore(): Promise<PersonaStore> {
   const prisma = getPrisma();
 
   return {
-    async getAll(): Promise<ColleagueConfig[]> {
-      const rows = await prisma.colleague.findMany({ orderBy: { id: "asc" } });
-      return rows.map(rowToColleague);
+    async getAll(): Promise<PersonaConfig[]> {
+      const rows = await prisma.persona.findMany({ orderBy: { id: "asc" } });
+      return rows.map(rowToPersona);
     },
 
-    async getById(id: string): Promise<ColleagueConfig | null> {
-      const row = await prisma.colleague.findUnique({ where: { id } });
+    async getById(id: string): Promise<PersonaConfig | null> {
+      const row = await prisma.persona.findUnique({ where: { id } });
       if (!row) return null;
-      return rowToColleague(row);
+      return rowToPersona(row);
     },
 
-    async addOrUpdate(colleague: ColleagueConfig): Promise<void> {
-      await prisma.colleague.upsert({
-        where: { id: colleague.id },
+    async addOrUpdate(persona: PersonaConfig): Promise<void> {
+      await prisma.persona.upsert({
+        where: { id: persona.id },
         create: {
-          id: colleague.id,
-          description: colleague.description ?? "",
-          responsibilities: colleague.responsibilities ?? "",
+          id: persona.id,
+          description: persona.description ?? "",
+          responsibilities: persona.responsibilities ?? "",
           allowed_connections: JSON.stringify(
-            colleague.allowed_connections ?? [],
+            persona.allowed_connections ?? [],
           ),
-          allowed_skills: JSON.stringify(colleague.allowed_skills ?? []),
-          memory: JSON.stringify(colleague.memory ?? { scope: "role" }),
+          allowed_skills: JSON.stringify(persona.allowed_skills ?? []),
+          memory: JSON.stringify(persona.memory ?? { scope: "role" }),
           reporting: JSON.stringify(
-            colleague.reporting ?? { on: ["task_complete", "uncertainty"] },
+            persona.reporting ?? { on: ["task_complete", "uncertainty"] },
           ),
         },
         update: {
-          description: colleague.description ?? "",
-          responsibilities: colleague.responsibilities ?? "",
+          description: persona.description ?? "",
+          responsibilities: persona.responsibilities ?? "",
           allowed_connections: JSON.stringify(
-            colleague.allowed_connections ?? [],
+            persona.allowed_connections ?? [],
           ),
-          allowed_skills: JSON.stringify(colleague.allowed_skills ?? []),
-          memory: JSON.stringify(colleague.memory ?? { scope: "role" }),
+          allowed_skills: JSON.stringify(persona.allowed_skills ?? []),
+          memory: JSON.stringify(persona.memory ?? { scope: "role" }),
           reporting: JSON.stringify(
-            colleague.reporting ?? { on: ["task_complete", "uncertainty"] },
+            persona.reporting ?? { on: ["task_complete", "uncertainty"] },
           ),
         },
       });
     },
 
     async remove(id: string): Promise<boolean> {
-      const result = await prisma.colleague.deleteMany({ where: { id } });
+      const result = await prisma.persona.deleteMany({ where: { id } });
       return (result.count ?? 0) > 0;
     },
   };

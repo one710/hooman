@@ -10,7 +10,7 @@ import {
 import type { MCPServer } from "@openai/agents";
 import { listSkillsFromFs, getSkillContent } from "./skills-cli.js";
 import type { SkillEntry } from "./skills-cli.js";
-import type { ColleagueConfig } from "../types.js";
+import type { PersonaConfig } from "../types.js";
 import type {
   MCPConnection,
   MCPConnectionHosted,
@@ -26,7 +26,7 @@ const debug = createDebug("hooman:agents-mcp");
 
 const HOOMAN_INSTRUCTIONS = `You are Hooman, a digital concierge that operates on behalf of the user.
 Be conversational and human-first. Use memory context when provided to tailor and remember preferences.
-When the user's request fits a specialized colleague you can hand off to, do so. Otherwise respond yourself.
+When a task fits a specialized persona (by role and capabilities), hand off to that persona to do it; otherwise respond yourself.
 
 ## Channel replies (IMPORTANT)
 
@@ -46,8 +46,8 @@ Steps when channel context is present:
 Never fabricate tool results. If a tool call fails, report the actual error.`;
 
 /**
- * Universal tool attached to every colleague: read full SKILL.md content by skill id (Level 2 loading).
- * Use when the colleague needs to follow a skill's full instructions.
+ * Universal tool attached to every persona: read full SKILL.md content by skill id (Level 2 loading).
+ * Use when the persona needs to follow a skill's full instructions.
  */
 const readSkillTool = tool({
   name: "read_skill",
@@ -210,8 +210,8 @@ function getAllDefaultMcpConnections(): MCPConnection[] {
   return [...getDefaultMcpConnections(), ...getChannelDefaultMcpConnections()];
 }
 
-/** IDs of general-purpose default MCP connections given to every colleague (fetch, time, filesystem — NOT channel MCPs). */
-function getColleagueDefaultMcpConnectionIds(): string[] {
+/** IDs of general-purpose default MCP connections given to every persona (fetch, time, filesystem — NOT channel MCPs). */
+function getPersonaDefaultMcpConnectionIds(): string[] {
   return getDefaultMcpConnections().map((c) => c.id);
 }
 
@@ -277,7 +277,7 @@ function buildHostedTool(c: MCPConnectionHosted) {
 
 /**
  * Build MCP servers (stdio, streamable_http) and hosted tools from connection configs.
- * Returns servers to connect and a map connectionId -> server or tool for assigning to colleagues.
+ * Returns servers to connect and a map connectionId -> server or tool for assigning to personas.
  */
 function buildMcpFromConnections(connections: MCPConnection[]): {
   servers: MCPServer[];
@@ -336,12 +336,12 @@ function buildSkillsMetadataSection(
 }
 
 /**
- * Create the Hooman agent with colleague handoffs, attaching MCP servers and tools
- * per colleague based on their allowed_connections, and skill metadata (Level 1) from
+ * Create the Hooman agent with persona handoffs, attaching MCP servers and tools
+ * per persona based on their allowed_connections, and skill metadata (Level 1) from
  * their allowed_skills. Connects MCP servers before building the agent. Call closeMcp() after run to close servers.
  */
 export async function createHoomanAgentWithMcp(
-  colleagues: ColleagueConfig[],
+  personas: PersonaConfig[],
   connections: MCPConnection[],
   options?: { apiKey?: string; model?: string },
 ): Promise<{
@@ -394,25 +394,23 @@ export async function createHoomanAgentWithMcp(
     }
   }
 
-  const colleagueAgents = colleagues.map((p) => {
+  const personaAgents = personas.map((p) => {
     const connectionIds = getConnectionIdsFromAllowedCapabilities(
       p.allowed_connections ?? [],
     );
-    const colleagueServers: MCPServer[] = [];
-    const colleagueTools: ReturnType<typeof hostedMcpTool>[] = [];
-    // Every colleague gets the general-purpose default MCP servers (fetch, time, filesystem) — NOT channel MCPs.
-    for (const id of getColleagueDefaultMcpConnectionIds()) {
+    const personaServers: MCPServer[] = [];
+    const personaTools: ReturnType<typeof hostedMcpTool>[] = [];
+    // Every persona gets the general-purpose default MCP servers (fetch, time, filesystem) — NOT channel MCPs.
+    for (const id of getPersonaDefaultMcpConnectionIds()) {
       const server = connectionIdToServer.get(id);
-      if (server && activeServers.includes(server))
-        colleagueServers.push(server);
+      if (server && activeServers.includes(server)) personaServers.push(server);
     }
-    // Plus any user-configured connections assigned to this colleague.
+    // Plus any user-configured connections assigned to this persona.
     for (const id of connectionIds) {
       const server = connectionIdToServer.get(id);
-      if (server && activeServers.includes(server))
-        colleagueServers.push(server);
+      if (server && activeServers.includes(server)) personaServers.push(server);
       const tool = connectionIdToHostedTool.get(id);
-      if (tool) colleagueTools.push(tool);
+      if (tool) personaTools.push(tool);
     }
 
     const baseInstructions = p.responsibilities?.trim() || p.description;
@@ -424,8 +422,8 @@ export async function createHoomanAgentWithMcp(
       name: p.id,
       instructions,
       handoffDescription: p.description,
-      mcpServers: colleagueServers,
-      tools: [readSkillTool, ...colleagueTools],
+      mcpServers: personaServers,
+      tools: [readSkillTool, ...personaTools],
     });
   });
 
@@ -451,7 +449,7 @@ export async function createHoomanAgentWithMcp(
   const agent = Agent.create({
     name: "Hooman",
     instructions: HOOMAN_INSTRUCTIONS,
-    handoffs: colleagueAgents,
+    handoffs: personaAgents,
     mcpServers: hoomanServers,
   });
 

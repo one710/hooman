@@ -4,26 +4,25 @@ import { useDialog } from "./Dialog";
 import { Button } from "./Button";
 import { Input } from "./Input";
 import { Textarea } from "./Textarea";
-import { Select } from "./Select";
 import { MultiSelect } from "./MultiSelect";
 import { Modal } from "./Modal";
-import type { ColleagueConfig } from "../types";
+import type { PersonaConfig } from "../types";
 import {
-  getColleagues,
+  getPersonas,
   getCapabilitiesAvailable,
   getSkillsList,
-  createColleague,
-  updateColleague,
-  deleteColleague,
+  createPersona,
+  updatePersona,
+  deletePersona,
 } from "../api";
 import type { SkillEntry } from "../api";
 
-export function Colleagues() {
+export function Personas() {
   const dialog = useDialog();
-  const [colleagues, setColleagues] = useState<ColleagueConfig[]>([]);
+  const [personas, setPersonas] = useState<PersonaConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<ColleagueConfig>>({});
+  const [form, setForm] = useState<Partial<PersonaConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [capabilitiesList, setCapabilitiesList] = useState<
     { integrationId: string; capability: string }[]
@@ -50,8 +49,8 @@ export function Colleagues() {
 
   function load() {
     setLoading(true);
-    getColleagues()
-      .then((r) => setColleagues(r.colleagues))
+    getPersonas()
+      .then((r) => setPersonas(r.personas))
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }
@@ -85,7 +84,7 @@ export function Colleagues() {
     });
   }
 
-  function startEdit(p: ColleagueConfig) {
+  function startEdit(p: PersonaConfig) {
     loadCapabilities();
     loadSkills();
     setEditing(p.id);
@@ -100,9 +99,9 @@ export function Colleagues() {
     setError(null);
     try {
       if (editing === "new") {
-        await createColleague(form as ColleagueConfig);
+        await createPersona(form as PersonaConfig);
       } else if (editing) {
-        await updateColleague(editing, form);
+        await updatePersona(editing, form);
       }
       setEditing(null);
       load();
@@ -113,14 +112,14 @@ export function Colleagues() {
 
   async function remove(id: string) {
     const ok = await dialog.confirm({
-      title: "Remove colleague",
-      message: "Remove this colleague?",
+      title: "Remove persona",
+      message: "Remove this persona?",
       confirmLabel: "Remove",
       variant: "danger",
     });
     if (!ok) return;
     try {
-      await deleteColleague(id);
+      await deletePersona(id);
       setEditing(null);
       load();
     } catch (e) {
@@ -128,9 +127,9 @@ export function Colleagues() {
     }
   }
 
-  if (loading && colleagues.length === 0) {
+  if (loading && personas.length === 0) {
     return (
-      <div className="p-4 md:p-6 text-hooman-muted">Loading colleagues…</div>
+      <div className="p-4 md:p-6 text-hooman-muted">Loading personas…</div>
     );
   }
 
@@ -139,10 +138,11 @@ export function Colleagues() {
       <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base md:text-lg font-semibold text-white">
-            Colleagues
+            Personas
           </h2>
           <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Specialized roles that handle different kinds of tasks for you.
+            Organize MCP connections and skills; Hooman hands off to a persona
+            when a task fits.
           </p>
         </div>
         <Button
@@ -150,13 +150,13 @@ export function Colleagues() {
           className="self-start sm:self-auto"
           icon={<Plus className="w-4 h-4" />}
         >
-          Add colleague
+          Add persona
         </Button>
       </header>
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing === "new" ? "New colleague" : "Edit colleague"}
+        title={editing === "new" ? "New persona" : "Edit persona"}
         footer={
           <div className="flex gap-2">
             <Button variant="success" onClick={save}>
@@ -212,7 +212,7 @@ export function Colleagues() {
             onChange={(selected) =>
               setForm((f) => ({ ...f, allowed_connections: selected }))
             }
-            placeholder="Pick MCP connections for this colleague"
+            placeholder="Pick MCP connections for this persona"
           />
           <MultiSelect
             label="Skills"
@@ -223,7 +223,7 @@ export function Colleagues() {
             onChange={(selected) =>
               setForm((f) => ({ ...f, allowed_skills: selected }))
             }
-            placeholder="Pick installed skills for this colleague"
+            placeholder="Pick installed skills for this persona"
           />
         </div>
       </Modal>
@@ -234,7 +234,7 @@ export function Colleagues() {
           </div>
         )}
         <ul className="space-y-3">
-          {colleagues.map((p) => (
+          {personas.map((p) => (
             <li
               key={p.id}
               className="rounded-xl border border-hooman-border bg-hooman-surface p-4 flex items-start justify-between"
@@ -264,9 +264,10 @@ export function Colleagues() {
             </li>
           ))}
         </ul>
-        {colleagues.length === 0 && !editing && (
+        {personas.length === 0 && !editing && (
           <p className="text-hooman-muted text-sm">
-            No colleagues yet. Add one to delegate specific tasks.
+            No personas yet. Add one to organize capabilities and hand off
+            tasks.
           </p>
         )}
       </div>

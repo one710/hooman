@@ -22,15 +22,15 @@ export interface ChatResultPayload {
 
 /**
  * Connect to the API's Socket.IO server. Call once (e.g. when the app or Chat mounts).
- * Uses the same origin as the API (VITE_API_BASE or current host).
+ * Uses the same base as the API (VITE_API_BASE or http://localhost:3000 in dev).
  */
 export function getSocket(baseUrl?: string): Socket {
-  const url = (baseUrl ?? import.meta.env.VITE_API_BASE ?? "").trim();
-  const origin =
-    url ||
-    (typeof window !== "undefined"
-      ? window.location.origin
-      : "http://localhost:3000");
+  const url = (
+    baseUrl ??
+    import.meta.env.VITE_API_BASE ??
+    "http://localhost:3000"
+  ).trim();
+  const origin = url || "http://localhost:3000";
   if (socketInstance?.connected) return socketInstance;
   if (socketInstance) socketInstance.disconnect();
   socketInstance = io(origin, {

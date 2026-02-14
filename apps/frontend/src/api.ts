@@ -121,31 +121,31 @@ export async function sendMessage(
   return { eventId: data.eventId };
 }
 
-export async function getColleagues(): Promise<{
-  colleagues: import("./types").ColleagueConfig[];
+export async function getPersonas(): Promise<{
+  personas: import("./types").PersonaConfig[];
 }> {
-  const res = await fetch(`${BASE}/api/colleagues`);
+  const res = await fetch(`${BASE}/api/personas`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function createColleague(
-  colleague: import("./types").ColleagueConfig,
-): Promise<{ colleague: import("./types").ColleagueConfig }> {
-  const res = await fetch(`${BASE}/api/colleagues`, {
+export async function createPersona(
+  persona: import("./types").PersonaConfig,
+): Promise<{ persona: import("./types").PersonaConfig }> {
+  const res = await fetch(`${BASE}/api/personas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(colleague),
+    body: JSON.stringify(persona),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function updateColleague(
+export async function updatePersona(
   id: string,
-  patch: Partial<import("./types").ColleagueConfig>,
-): Promise<{ colleague: import("./types").ColleagueConfig }> {
-  const res = await fetch(`${BASE}/api/colleagues/${id}`, {
+  patch: Partial<import("./types").PersonaConfig>,
+): Promise<{ persona: import("./types").PersonaConfig }> {
+  const res = await fetch(`${BASE}/api/personas/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -154,8 +154,8 @@ export async function updateColleague(
   return res.json();
 }
 
-export async function deleteColleague(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/colleagues/${id}`, { method: "DELETE" });
+export async function deletePersona(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/personas/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -173,7 +173,7 @@ export async function getKillSwitch(): Promise<{ enabled: boolean }> {
   return res.json();
 }
 
-/** Available capabilities from configured MCP connections (for Colleagues dropdown). */
+/** Available capabilities from configured MCP connections (for Personas dropdown). */
 export async function getCapabilitiesAvailable(): Promise<{
   capabilities: { integrationId: string; capability: string }[];
 }> {

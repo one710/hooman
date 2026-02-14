@@ -6,7 +6,7 @@
 
 **Your virtual workforce, one concierge.** 🧑‍💼
 
-Build a team of AI colleagues—each with their own capabilities and skills—and talk only to **Hooman**. Hooman is the concierge: they remember context, decide when to handle something themselves or hand off to the right colleague, and keep you in control with approvals and a full audit trail.
+Personas organize MCP connections and skills; you talk only to **Hooman**. Hooman is the concierge: they remember context, decide when to handle something themselves or hand off to a persona when a task fits, and keep you in control with approvals and a full audit trail.
 
 </div>
 
@@ -20,24 +20,24 @@ Build a team of AI colleagues—each with their own capabilities and skills—an
 
 ## Why Hooman? ✨
 
-You don't manage a dozen bots. You have **one conversation** with Hooman. Want a report drafted? A meeting summarized? Research done? You say it. Hooman either does it or delegates to a colleague who can (fetch, filesystem, custom MCP servers, installed skills). You get one place to chat, schedule tasks, and see what happened—without talking to individual agents.
+You don't manage a dozen bots. You have **one conversation** with Hooman. Want a report drafted? A meeting summarized? Research done? You say it. Hooman either does it or hands off to a persona that can (fetch, filesystem, custom MCP servers, installed skills). You get one place to chat, schedule tasks, and see what happened—without talking to individual agents.
 
 - **🚪 One front door** — Chat, schedule, and inspect everything through Hooman.
-- **🦸 Colleagues with superpowers** — Give each colleague a role (e.g. researcher, writer) and attach MCP connections and skills. Hooman hands off when it makes sense.
+- **🦸 Personas with superpowers** — Give each persona a role (e.g. researcher, writer) and attach MCP connections and skills. Hooman hands off when a task fits.
 - **🎛️ Under your control** — Kill switch, capability approvals, and an audit log so you see who did what and when.
 
 ---
 
 ## How it works ⚙️
 
-| Concept             | What it is                                                                                                                                           |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **🤖 Hooman**       | The main agent. Reasons over memory, handles your messages and scheduled tasks, and delegates to colleagues when needed.                             |
-| **👥 Colleagues**   | Role-based sub-agents you define (id, description, responsibilities). Each can have specific MCP connections and skills. Hooman routes work to them. |
-| **🔌 Capabilities** | MCP servers (fetch, time, filesystem, or your own) and skills. You assign which colleagues get which capabilities.                                   |
-| **🧠 Memory**       | mem0: in-memory vector store + SQLite history (memory.db) so Hooman can use past context.                                                            |
+| Concept             | What it is                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **🤖 Hooman**       | The main agent. Reasons over memory, handles your messages and scheduled tasks, and hands off to personas when needed.                                  |
+| **👥 Personas**     | Role-based handoff targets you define (id, description, responsibilities). Each has specific MCP connections and skills. Hooman delegates work to them. |
+| **🔌 Capabilities** | MCP servers (fetch, time, filesystem, or your own) and skills. You assign which personas get which capabilities.                                        |
+| **🧠 Memory**       | mem0: in-memory vector store + SQLite history (memory.db) so Hooman can use past context.                                                               |
 
-You chat with Hooman; Hooman uses memory, may call a colleague, and responds. Scheduled tasks run the same way—at a set time, Hooman processes the task like a message (reasoning, handoff, audit).
+You chat with Hooman; Hooman uses memory, may hand off to a persona, and responds. Scheduled tasks run the same way—at a set time, Hooman processes the task like a message (reasoning, handoff, audit).
 
 ---
 
@@ -78,7 +78,7 @@ npx pm2 start ecosystem.config.cjs
 - **API** → http://localhost:3000
 - **Web UI** → http://localhost:5173
 
-Set your OpenAI API key and models in **Settings**, then chat with Hooman and add Colleagues in the UI.
+Set your OpenAI API key and models in **Settings**, then chat with Hooman and add Personas in the UI.
 
 To stop: `npx pm2 stop ecosystem.config.cjs` (or `yarn stop`).
 

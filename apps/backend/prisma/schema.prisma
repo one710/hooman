@@ -29,7 +29,7 @@ model ChatAttachment {
   @@index([userId, createdAt])
 }
 
-model Colleague {
+model Persona {
   id                  String @id
   description         String @default("")
   responsibilities    String @default("")

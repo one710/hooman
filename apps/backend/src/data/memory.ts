@@ -29,19 +29,19 @@ export interface IMemoryService {
     options?: {
       userId?: string;
       metadata?: Record<string, unknown>;
-      colleagueId?: string;
+      personaId?: string;
     },
   ): Promise<void>;
   search(
     query: string,
-    options?: { userId?: string; limit?: number; colleagueId?: string },
+    options?: { userId?: string; limit?: number; personaId?: string },
   ): Promise<MemorySearchResult[]>;
   getAll(options?: {
     userId?: string;
-    colleagueId?: string;
+    personaId?: string;
   }): Promise<MemorySearchResult[]>;
   delete(memoryId: string): Promise<void>;
-  deleteAll(options?: { userId?: string; colleagueId?: string }): Promise<void>;
+  deleteAll(options?: { userId?: string; personaId?: string }): Promise<void>;
 }
 
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
@@ -95,7 +95,7 @@ class Mem0Adapter implements IMemoryService {
     options?: {
       userId?: string;
       metadata?: Record<string, unknown>;
-      colleagueId?: string;
+      personaId?: string;
     },
   ): Promise<void> {
     await this.mem.add(messages, {
@@ -107,7 +107,7 @@ class Mem0Adapter implements IMemoryService {
 
   async search(
     query: string,
-    options?: { userId?: string; limit?: number; colleagueId?: string },
+    options?: { userId?: string; limit?: number; personaId?: string },
   ): Promise<MemorySearchResult[]> {
     const out = await this.mem.search(query, {
       userId: options?.userId ?? "default",
@@ -125,7 +125,7 @@ class Mem0Adapter implements IMemoryService {
 
   async getAll(options?: {
     userId?: string;
-    colleagueId?: string;
+    personaId?: string;
   }): Promise<MemorySearchResult[]> {
     const out = await this.mem.getAll({ userId: options?.userId ?? "default" });
     const results = Array.isArray(out) ? out : (out?.results ?? []);
@@ -150,7 +150,7 @@ class Mem0Adapter implements IMemoryService {
 
   async deleteAll(options?: {
     userId?: string;
-    colleagueId?: string;
+    personaId?: string;
   }): Promise<void> {
     await this.mem.deleteAll({ userId: options?.userId ?? "default" });
   }

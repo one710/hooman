@@ -102,7 +102,7 @@ export async function runChat(
 ): Promise<{
   finalOutput: string;
   history: AgentInputItem[];
-  /** Name of the agent that produced the final output (Hooman or a colleague id). */
+  /** Name of the agent that produced the final output (Hooman or a persona id). */
   lastAgentName?: string;
   /** Run items from the SDK (includes handoff_call_item / handoff_output_item for tracing). */
   newItems: Array<{

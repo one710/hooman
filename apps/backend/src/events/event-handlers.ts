@@ -5,7 +5,7 @@
 import createDebug from "debug";
 import type { EventRouter } from "./event-router.js";
 import type { ContextStore } from "../agents/context.js";
-import type { ColleagueEngine } from "../agents/colleagues.js";
+import type { PersonaEngine } from "../agents/personas.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import type { AuditLog } from "../audit.js";
 import { runChat } from "../agents/agents-runner.js";
@@ -60,7 +60,7 @@ class ChatTimeoutError extends Error {
 export interface EventHandlerDeps {
   eventRouter: EventRouter;
   context: ContextStore;
-  colleagueEngine: ColleagueEngine;
+  personaEngine: PersonaEngine;
   mcpConnectionsStore: MCPConnectionsStore;
   getConfig: () => { OPENAI_API_KEY: string; OPENAI_MODEL: string };
   auditLog: AuditLog;
@@ -75,7 +75,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
   const {
     eventRouter,
     context,
-    colleagueEngine,
+    personaEngine,
     mcpConnectionsStore,
     getConfig,
     auditLog,
@@ -131,10 +131,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
-      const colleagues = colleagueEngine.getAll();
+      const personas = personaEngine.getAll();
       const connections = await mcpConnectionsStore.getAll();
       const { agent, closeMcp } = await createHoomanAgentWithMcp(
-        colleagues,
+        personas,
         connections,
         {
           apiKey: config.OPENAI_API_KEY || undefined,
@@ -275,10 +275,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
-      const colleagues = colleagueEngine.getAll();
+      const personas = personaEngine.getAll();
       const connections = await mcpConnectionsStore.getAll();
       const { agent, closeMcp } = await createHoomanAgentWithMcp(
-        colleagues,
+        personas,
         connections,
         {
           apiKey: apiConfig.OPENAI_API_KEY || undefined,

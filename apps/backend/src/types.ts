@@ -162,7 +162,7 @@ export interface WhatsAppChannelMeta extends ChannelMetaBase {
   selfMentioned?: boolean;
 }
 
-/** Union of all channel-specific metadata. Delivered in run context to colleagues. */
+/** Union of all channel-specific metadata. Delivered in run context to personas. */
 export type ChannelMeta =
   | SlackChannelMeta
   | EmailChannelMeta
@@ -175,7 +175,7 @@ export interface NormalizedMessagePayload {
   attachments?: ChatAttachment[];
   /** IDs of uploaded files (for persisting with chat history). */
   attachment_ids?: string[];
-  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to colleagues. */
+  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to personas. */
   channelMeta?: ChannelMeta;
 }
 
@@ -244,7 +244,7 @@ export interface Decision {
   eventId: string;
   reasoning?: string;
   payload?: {
-    colleagueIds?: string[];
+    personaIds?: string[];
     response?: string;
     scheduledAt?: string;
     intent?: string;
@@ -262,7 +262,7 @@ export type MemoryType =
   | "short_term"
   | "episodic"
   | "long_term"
-  | "colleague_scoped"
+  | "persona_scoped"
   | "summary";
 
 export interface MemoryEntry {
@@ -270,18 +270,18 @@ export interface MemoryEntry {
   type: MemoryType;
   content: string;
   metadata?: Record<string, unknown>;
-  colleagueId?: string;
+  personaId?: string;
   createdAt: string;
 }
 
-// Colleagues
-export interface ColleagueConfig {
+// Personas
+export interface PersonaConfig {
   id: string;
   description: string;
   responsibilities: string;
-  /** MCP connection IDs attached to this colleague. */
+  /** MCP connection IDs attached to this persona. */
   allowed_connections: string[];
-  /** Installed skill IDs attached to this colleague. */
+  /** Installed skill IDs attached to this persona. */
   allowed_skills?: string[];
   memory: { scope: "role" | "global" };
   reporting: {

@@ -18,9 +18,9 @@ import { EventRouter } from "../events/event-router.js";
 import { registerEventHandlers } from "../events/event-handlers.js";
 import { createMemoryService } from "../data/memory.js";
 import { AuditLog } from "../audit.js";
-import { ColleagueEngine } from "../agents/colleagues.js";
+import { PersonaEngine } from "../agents/personas.js";
 import { createContext } from "../agents/context.js";
-import { initColleagueStore } from "../data/colleagues-store.js";
+import { initPersonaStore } from "../data/personas-store.js";
 import { initScheduleStore } from "../data/schedule-store.js";
 import { initMCPConnectionsStore } from "../data/mcp-connections-store.js";
 import { initDb } from "../data/db.js";
@@ -63,9 +63,9 @@ async function main() {
   });
   const chatHistory = await initChatHistory();
   const context = createContext(memory, chatHistory);
-  const colleagueStore = await initColleagueStore();
-  const colleagueEngine = new ColleagueEngine(colleagueStore);
-  await colleagueEngine.load();
+  const personaStore = await initPersonaStore();
+  const personaEngine = new PersonaEngine(personaStore);
+  await personaEngine.load();
   const mcpConnectionsStore = await initMCPConnectionsStore();
   await initScheduleStore();
   const auditStore = createAuditStore({
@@ -85,7 +85,7 @@ async function main() {
   registerEventHandlers({
     eventRouter,
     context,
-    colleagueEngine,
+    personaEngine,
     mcpConnectionsStore,
     getConfig,
     auditLog,

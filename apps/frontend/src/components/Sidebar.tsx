@@ -22,7 +22,7 @@ interface SidebarProps {
 const nav: { id: View; label: string; Icon: LucideIcon }[] = [
   { id: "chat", label: "Chat", Icon: MessageCircle },
   { id: "channels", label: "Channels", Icon: Radio },
-  { id: "colleagues", label: "Colleagues", Icon: Users },
+  { id: "personas", label: "Personas", Icon: Users },
   { id: "schedule", label: "Schedule", Icon: Clock },
   { id: "audit", label: "Audit log", Icon: ClipboardList },
   { id: "safety", label: "Safety", Icon: Shield },
