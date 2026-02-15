@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 import type { ResponsePayload } from "./audit.js";
 import { getConfig, loadPersisted } from "./config.js";
 import { registerRoutes } from "./routes/index.js";
+import { localhostOnly } from "./middleware/localhost-only.js";
 import { initDb } from "./data/db.js";
 import { initChatHistory } from "./data/chat-history.js";
 import { initAttachmentStore } from "./data/attachment-store.js";
@@ -105,6 +106,7 @@ async function main() {
   const app = express();
   app.use(cors({ origin: true }));
   app.use(express.json());
+  app.use(localhostOnly);
 
   const server = http.createServer(app);
   const io = new SocketServer(server, {

@@ -137,6 +137,8 @@ export interface PersistedConfig {
   MISTRAL_API_KEY: string;
   /** DeepSeek */
   DEEPSEEK_API_KEY: string;
+  /** Bearer token for OpenAI-compatible /v1/chat/completions endpoint. */
+  COMPLETIONS_API_KEY: string;
 }
 
 /** Full config: persisted + PORT from env. */
@@ -171,6 +173,7 @@ const DEFAULTS: PersistedConfig = {
   GOOGLE_VERTEX_API_KEY: "",
   MISTRAL_API_KEY: "",
   DEEPSEEK_API_KEY: "",
+  COMPLETIONS_API_KEY: "",
 };
 
 let store: PersistedConfig = { ...DEFAULTS };
@@ -274,6 +277,8 @@ export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
     store.MISTRAL_API_KEY = String(patch.MISTRAL_API_KEY);
   if (patch.DEEPSEEK_API_KEY !== undefined)
     store.DEEPSEEK_API_KEY = String(patch.DEEPSEEK_API_KEY);
+  if (patch.COMPLETIONS_API_KEY !== undefined)
+    store.COMPLETIONS_API_KEY = String(patch.COMPLETIONS_API_KEY);
   persist().catch((err) => debug("persist error: %o", err));
   return { ...store };
 }
@@ -380,6 +385,8 @@ export async function loadPersisted(): Promise<void> {
         store.MISTRAL_API_KEY = String(parsed.MISTRAL_API_KEY);
       if (parsed.DEEPSEEK_API_KEY !== undefined)
         store.DEEPSEEK_API_KEY = String(parsed.DEEPSEEK_API_KEY);
+      if (parsed.COMPLETIONS_API_KEY !== undefined)
+        store.COMPLETIONS_API_KEY = String(parsed.COMPLETIONS_API_KEY);
       if (parsed.channels && typeof parsed.channels === "object")
         channelsStore = { ...parsed.channels };
     }

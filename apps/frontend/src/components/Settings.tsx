@@ -83,6 +83,7 @@ export function Settings() {
         GOOGLE_VERTEX_API_KEY: form.GOOGLE_VERTEX_API_KEY,
         MISTRAL_API_KEY: form.MISTRAL_API_KEY,
         DEEPSEEK_API_KEY: form.DEEPSEEK_API_KEY,
+        COMPLETIONS_API_KEY: form.COMPLETIONS_API_KEY,
       });
       setForm({ ...updated });
       setMessage({
@@ -772,6 +773,35 @@ export function Settings() {
               </div>
             )}
           </div>
+
+          <div className="pt-4 border-t border-hooman-border">
+            <h3 className="text-sm font-medium text-zinc-300 mb-2">
+              Completions API
+            </h3>
+            <p className="text-xs text-hooman-muted mb-3">
+              Bearer token for the OpenAI-compatible /v1/chat/completions
+              endpoint. External platforms (e.g. ElevenLabs) use this to access
+              Hooman&apos;s agent capabilities.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                Completions API key
+              </label>
+              <Input
+                type="password"
+                value={form.COMPLETIONS_API_KEY ?? ""}
+                onChange={(e) =>
+                  setForm((f) =>
+                    f ? { ...f, COMPLETIONS_API_KEY: e.target.value } : f,
+                  )
+                }
+                placeholder="..."
+                className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
           <Checkbox
             id="web-search"
             checked={form.OPENAI_WEB_SEARCH ?? false}

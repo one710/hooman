@@ -288,6 +288,7 @@ export interface AppConfig {
   GOOGLE_VERTEX_API_KEY?: string;
   MISTRAL_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
+  COMPLETIONS_API_KEY?: string;
 }
 
 export async function getConfig(): Promise<AppConfig> {

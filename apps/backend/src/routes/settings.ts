@@ -40,6 +40,7 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
       GOOGLE_VERTEX_API_KEY: c.GOOGLE_VERTEX_API_KEY,
       MISTRAL_API_KEY: c.MISTRAL_API_KEY,
       DEEPSEEK_API_KEY: c.DEEPSEEK_API_KEY,
+      COMPLETIONS_API_KEY: c.COMPLETIONS_API_KEY,
     });
   });
 
@@ -90,6 +91,7 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
       GOOGLE_VERTEX_API_KEY: patch.GOOGLE_VERTEX_API_KEY as string | undefined,
       MISTRAL_API_KEY: patch.MISTRAL_API_KEY as string | undefined,
       DEEPSEEK_API_KEY: patch.DEEPSEEK_API_KEY as string | undefined,
+      COMPLETIONS_API_KEY: patch.COMPLETIONS_API_KEY as string | undefined,
     });
     res.json(updated);
   });
