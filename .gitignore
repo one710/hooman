@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 
 # WhatsApp
 .wwebjs_cache/
+
+# Embeddings
+.embeddings.cache.json
