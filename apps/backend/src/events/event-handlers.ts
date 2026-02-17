@@ -141,7 +141,6 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       [{ role: "user", content: `[${sourceLabel}] ${text}` }],
       { userId, metadata: { source: event.source } },
     );
-    const config = getConfig();
     let assistantText = "";
     try {
       const recent = await context.getRecentMessages(userId, CHAT_THREAD_LIMIT);
@@ -236,9 +235,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
           "This is taking longer than expected. The agent may be using a tool or waiting on a handoff. You can try again or rephrase.";
       } else {
         const msg = (err as Error).message;
-        assistantText = !config.OPENAI_API_KEY?.trim()
-          ? `[${getConfig().AGENT_NAME}] No LLM API key configured. Set it in Settings to enable chat.`
-          : `Something went wrong: ${msg}. Check API logs.`;
+        assistantText = `Something went wrong: ${msg}. Check API logs.`;
       }
       await context.addToMemory(
         [{ role: "assistant", content: assistantText }],
