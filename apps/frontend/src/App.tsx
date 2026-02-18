@@ -3,7 +3,6 @@ import { Menu } from "lucide-react";
 import { Chat } from "./components/Chat";
 import { Channels } from "./components/Channels";
 import { Sidebar } from "./components/Sidebar";
-import { Personas } from "./components/Personas";
 import { Schedule } from "./components/Schedule";
 import { Audit } from "./components/Audit";
 import { Safety } from "./components/Safety";
@@ -18,7 +17,6 @@ const CHAT_PAGE_SIZE = 50;
 const VIEW_LABELS: Record<View, string> = {
   chat: "Chat",
   channels: "Channels",
-  personas: "Personas",
   schedule: "Schedule",
   audit: "Audit log",
   safety: "Safety",
@@ -109,7 +107,6 @@ export default function App() {
             onClearChat={handleClearChat}
           />
         )}
-        {view === "personas" && <Personas />}
         {view === "schedule" && <Schedule />}
         {view === "audit" && <Audit />}
         {view === "safety" && <Safety />}

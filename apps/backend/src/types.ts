@@ -162,7 +162,7 @@ export interface WhatsAppChannelMeta extends ChannelMetaBase {
   selfMentioned?: boolean;
 }
 
-/** Union of all channel-specific metadata. Delivered in run context to personas. */
+/** Union of all channel-specific metadata. Delivered in run context to the agent. */
 export type ChannelMeta =
   | SlackChannelMeta
   | EmailChannelMeta
@@ -175,7 +175,7 @@ export interface NormalizedMessagePayload {
   attachments?: ChatAttachment[];
   /** IDs of uploaded files (for persisting with chat history). */
   attachment_ids?: string[];
-  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to personas. */
+  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to the agent. */
   channelMeta?: ChannelMeta;
   /** Set when the message text was transcribed from an audio/voice message. */
   sourceMessageType?: "audio";
@@ -246,7 +246,6 @@ export interface Decision {
   eventId: string;
   reasoning?: string;
   payload?: {
-    personaIds?: string[];
     response?: string;
     scheduledAt?: string;
     intent?: string;
@@ -260,35 +259,14 @@ export interface Decision {
 }
 
 // Memory
-export type MemoryType =
-  | "short_term"
-  | "episodic"
-  | "long_term"
-  | "persona_scoped"
-  | "summary";
+export type MemoryType = "short_term" | "episodic" | "long_term" | "summary";
 
 export interface MemoryEntry {
   id: string;
   type: MemoryType;
   content: string;
   metadata?: Record<string, unknown>;
-  personaId?: string;
   createdAt: string;
-}
-
-// Personas
-export interface PersonaConfig {
-  id: string;
-  description: string;
-  responsibilities: string;
-  /** MCP connection IDs attached to this persona. */
-  allowed_connections: string[];
-  /** Installed skill IDs attached to this persona. */
-  allowed_skills?: string[];
-  memory: { scope: "role" | "global" };
-  reporting: {
-    on: ("task_complete" | "uncertainty" | "error")[];
-  };
 }
 
 // Integrations & capabilities
@@ -321,7 +299,7 @@ export interface KillSwitchState {
   at?: string;
 }
 
-// MCP connection configs (aligned with OpenAI Agents SDK MCP: Hosted, Streamable HTTP, Stdio)
+// MCP connection configs (Hosted, Streamable HTTP, Stdio)
 export type MCPRequireApproval =
   | "always"
   | "never"
@@ -359,9 +337,9 @@ export interface MCPConnectionStdio {
   name: string;
   command: string;
   args: string[];
-  /** Optional env vars for the process (Agents SDK MCPServerStdio env). */
+  /** Optional env vars for the process. */
   env?: Record<string, string>;
-  /** Optional working directory (Agents SDK MCPServerStdio cwd). */
+  /** Optional working directory. */
   cwd?: string;
   created_at?: string;
 }

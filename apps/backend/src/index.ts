@@ -8,7 +8,6 @@ const debug = createDebug("hooman:api");
 import { EventRouter } from "./events/event-router.js";
 import { createMemoryService } from "./data/memory.js";
 import { AuditLog } from "./audit.js";
-import { PersonaEngine } from "./agents/personas.js";
 import type { ScheduleService, ScheduledTask } from "./data/scheduler.js";
 import { randomUUID } from "crypto";
 import type { ResponsePayload } from "./audit.js";
@@ -19,7 +18,6 @@ import { initDb } from "./data/db.js";
 import { initChatHistory } from "./data/chat-history.js";
 import { initAttachmentStore } from "./data/attachment-store.js";
 import { createContext } from "./agents/context.js";
-import { initPersonaStore } from "./data/personas-store.js";
 import { initScheduleStore } from "./data/schedule-store.js";
 import { initMCPConnectionsStore } from "./data/mcp-connections-store.js";
 import {
@@ -68,10 +66,6 @@ async function main() {
   const chatHistory = await initChatHistory();
   const attachmentStore = await initAttachmentStore(ATTACHMENTS_DATA_DIR);
   const context = createContext(memory, chatHistory);
-
-  const personaStore = await initPersonaStore();
-  const personaEngine = new PersonaEngine(personaStore);
-  await personaEngine.load();
 
   const scheduleStore = await initScheduleStore();
   const mcpConnectionsStore = await initMCPConnectionsStore();
@@ -131,7 +125,6 @@ async function main() {
     eventRouter,
     context,
     auditLog,
-    personaEngine,
     responseStore,
     scheduler,
     io,

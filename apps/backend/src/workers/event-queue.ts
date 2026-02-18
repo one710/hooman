@@ -1,27 +1,18 @@
 /**
  * Event-queue worker: runs the BullMQ worker that processes events (chat, scheduled tasks).
- * Agents run here; human-friendly trace export is configured in this process.
- * Posts chat results to API via POST /api/internal/chat-result.
+ * Agents run here. Posts chat results to API via POST /api/internal/chat-result.
  * Run as a separate PM2 process (e.g. pm2 start ecosystem.config.cjs --only event-queue).
  */
 import createDebug from "debug";
 import { randomUUID } from "crypto";
 import { mkdirSync } from "fs";
-import {
-  addTraceProcessor,
-  BatchTraceProcessor,
-  startTraceExportLoop,
-} from "@openai/agents";
-import { HumanFriendlyConsoleExporter } from "../agents/tracing.js";
 import { loadPersisted, getConfig } from "../config.js";
 import { createEventQueue } from "../events/event-queue.js";
 import { EventRouter } from "../events/event-router.js";
 import { registerEventHandlers } from "../events/event-handlers.js";
 import { createMemoryService } from "../data/memory.js";
 import { AuditLog } from "../audit.js";
-import { PersonaEngine } from "../agents/personas.js";
 import { createContext } from "../agents/context.js";
-import { initPersonaStore } from "../data/personas-store.js";
 import type { ScheduleService, ScheduledTask } from "../data/scheduler.js";
 import { initScheduleStore } from "../data/schedule-store.js";
 import { initMCPConnectionsStore } from "../data/mcp-connections-store.js";
@@ -52,11 +43,6 @@ async function main() {
   initRedis(env.REDIS_URL);
   initKillSwitch(env.REDIS_URL);
 
-  addTraceProcessor(
-    new BatchTraceProcessor(new HumanFriendlyConsoleExporter()),
-  );
-  startTraceExportLoop();
-
   const config = getConfig();
   const memory = await createMemoryService({
     openaiApiKey: config.OPENAI_API_KEY,
@@ -64,9 +50,6 @@ async function main() {
   });
   const chatHistory = await initChatHistory();
   const context = createContext(memory, chatHistory);
-  const personaStore = await initPersonaStore();
-  const personaEngine = new PersonaEngine(personaStore);
-  await personaEngine.load();
   const mcpConnectionsStore = await initMCPConnectionsStore();
   const scheduleStore = await initScheduleStore();
   const scheduler: ScheduleService = {
@@ -95,9 +78,7 @@ async function main() {
   registerEventHandlers({
     eventRouter,
     context,
-    personaEngine,
     mcpConnectionsStore,
-    getConfig,
     auditLog,
     scheduler,
     deliverApiResult: async (eventId, message) => {

@@ -129,7 +129,7 @@ export function Settings() {
           <div className="pt-0">
             <h3 className="text-sm font-medium text-zinc-300 mb-2">Agent</h3>
             <p className="text-xs text-hooman-muted mb-3">
-              Name and system instructions for the main concierge agent.
+              Name and system instructions for the main agent.
             </p>
             <div className="space-y-3">
               <div>
@@ -159,7 +159,7 @@ export function Settings() {
                       f ? { ...f, AGENT_INSTRUCTIONS: e.target.value } : f,
                     )
                   }
-                  placeholder="Default concierge instructions"
+                  placeholder="Default agent instructions"
                   rows={14}
                   className="bg-hooman-surface focus:ring-offset-hooman-surface font-mono text-sm"
                 />

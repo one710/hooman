@@ -29,16 +29,6 @@ model ChatAttachment {
   @@index([userId, createdAt])
 }
 
-model Persona {
-  id                  String @id
-  description         String @default("")
-  responsibilities    String @default("")
-  allowed_connections String @default("[]")
-  allowed_skills      String @default("[]")
-  memory              String @default("{\"scope\":\"role\"}")
-  reporting           String @default("{\"on\":[\"task_complete\",\"uncertainty\"]}")
-}
-
 model Schedule {
   id         String @id
   execute_at String

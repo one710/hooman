@@ -5,12 +5,10 @@
 import createDebug from "debug";
 import type { EventRouter } from "./event-router.js";
 import type { ContextStore } from "../agents/context.js";
-import type { PersonaEngine } from "../agents/personas.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import type { ScheduleService } from "../data/scheduler.js";
 import type { AuditLog } from "../audit.js";
-import { runChat } from "../agents/agents-runner.js";
-import { createHoomanAgentWithMcp } from "../agents/agents-mcp.js";
+import { createHoomanRunner } from "../agents/hooman-runner.js";
 import type { RawDispatchInput, ChannelMeta } from "../types.js";
 
 const debug = createDebug("hooman:event-handlers");
@@ -48,7 +46,7 @@ function buildChannelContext(
 }
 
 const CHAT_THREAD_LIMIT = 30;
-/** Max time to wait for runChat (e.g. handoffs to WebBrowser can block). After this we deliver a timeout message so the UI doesn't stay on "Thinking...". */
+/** Max time to wait for runChat. After this we deliver a timeout message so the UI doesn't stay on "Thinking...". */
 const CHAT_TIMEOUT_MS = 90_000;
 
 class ChatTimeoutError extends Error {
@@ -61,20 +59,14 @@ class ChatTimeoutError extends Error {
 export interface EventHandlerDeps {
   eventRouter: EventRouter;
   context: ContextStore;
-  personaEngine: PersonaEngine;
   mcpConnectionsStore: MCPConnectionsStore;
-  getConfig: () => {
-    OPENAI_API_KEY: string;
-    OPENAI_MODEL: string;
-    AGENT_NAME: string;
-  };
   auditLog: AuditLog;
   /** Schedule service for main agent schedule tools (list/create/cancel). When set, worker passes it so the agent can schedule tasks. */
   scheduler?: ScheduleService;
   /** When set, called for api-source chat to deliver result (API: resolve pending; worker: POST to API). */
   deliverApiResult?: (
     eventId: string,
-    message: { role: "assistant"; text: string; lastAgentName?: string },
+    message: { role: "assistant"; text: string },
   ) => void | Promise<void>;
 }
 
@@ -82,9 +74,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
   const {
     eventRouter,
     context,
-    personaEngine,
     mcpConnectionsStore,
-    getConfig,
     auditLog,
     scheduler,
     deliverApiResult,
@@ -150,18 +140,16 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
-      const personas = personaEngine.getAll();
       const connections = await mcpConnectionsStore.getAll();
-      const { agent, closeMcp } = await createHoomanAgentWithMcp(
-        personas,
+      const session = await createHoomanRunner({
         connections,
-        scheduler ? { scheduleService: scheduler } : undefined,
-      );
+        scheduleService: scheduler,
+      });
       try {
         const channelContext = buildChannelContext(
           channelMeta as ChannelMeta | undefined,
         );
-        const runPromise = runChat(agent, thread, text, {
+        const runPromise = session.runChat(thread, text, {
           memoryContext,
           channelContext,
           attachments,
@@ -169,28 +157,18 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new ChatTimeoutError()), CHAT_TIMEOUT_MS);
         });
-        const { finalOutput, lastAgentName, newItems } = await Promise.race([
+        const { finalOutput } = await Promise.race([
           runPromise,
           timeoutPromise,
         ]);
         assistantText =
           finalOutput?.trim() ||
           "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
-        const handoffs = (newItems ?? []).filter(
-          (i) =>
-            i.type === "handoff_call_item" || i.type === "handoff_output_item",
-        );
         await auditLog.appendAuditEntry({
           type: "agent_run",
           payload: {
             userInput: text,
             response: assistantText,
-            lastAgentName: lastAgentName ?? getConfig().AGENT_NAME,
-            handoffs: handoffs.map((h) => ({
-              type: h.type,
-              from: h.agent?.name ?? h.sourceAgent?.name,
-              to: h.targetAgent?.name,
-            })),
           },
         });
         auditLog.emitResponse({
@@ -219,20 +197,16 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
           await deliverApiResult(event.id, {
             role: "assistant",
             text: assistantText,
-            lastAgentName: lastAgentName ?? undefined,
           });
         }
       } finally {
-        await closeMcp();
+        await session.closeMcp();
       }
     } catch (err) {
       if (err instanceof ChatTimeoutError) {
-        debug(
-          "Chat timed out after %s ms (handoff may still be running)",
-          CHAT_TIMEOUT_MS,
-        );
+        debug("Chat timed out after %s ms", CHAT_TIMEOUT_MS);
         assistantText =
-          "This is taking longer than expected. The agent may be using a tool or waiting on a handoff. You can try again or rephrase.";
+          "This is taking longer than expected. The agent may be using a tool. You can try again or rephrase.";
       } else {
         const msg = (err as Error).message;
         assistantText = `Something went wrong: ${msg}. Check API logs.`;
@@ -286,27 +260,18 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
-      const personas = personaEngine.getAll();
       const connections = await mcpConnectionsStore.getAll();
-      const { agent, closeMcp } = await createHoomanAgentWithMcp(
-        personas,
+      const session = await createHoomanRunner({
         connections,
-        scheduler ? { scheduleService: scheduler } : undefined,
-      );
+        scheduleService: scheduler,
+      });
       try {
-        const { finalOutput, lastAgentName, newItems } = await runChat(
-          agent,
-          [],
-          text,
-          { memoryContext },
-        );
+        const { finalOutput } = await session.runChat([], text, {
+          memoryContext,
+        });
         const assistantText =
           finalOutput?.trim() ||
           "Scheduled task completed (no clear response from agent).";
-        const handoffs = (newItems ?? []).filter(
-          (i) =>
-            i.type === "handoff_call_item" || i.type === "handoff_output_item",
-        );
         await auditLog.appendAuditEntry({
           type: "scheduled_task",
           payload: {
@@ -320,12 +285,6 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
           payload: {
             userInput: text,
             response: assistantText,
-            lastAgentName: lastAgentName ?? getConfig().AGENT_NAME,
-            handoffs: handoffs.map((h) => ({
-              type: h.type,
-              from: h.agent?.name ?? h.sourceAgent?.name,
-              to: h.targetAgent?.name,
-            })),
           },
         });
         auditLog.emitResponse({
@@ -339,7 +298,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
           { userId: "default", metadata: { source: "scheduler" } },
         );
       } finally {
-        await closeMcp();
+        await session.closeMcp();
       }
     } catch (err) {
       debug("scheduled task handler error: %o", err);

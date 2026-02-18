@@ -1,7 +1,6 @@
 export type View =
   | "chat"
   | "channels"
-  | "personas"
   | "schedule"
   | "audit"
   | "safety"
@@ -11,24 +10,10 @@ export type View =
 export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
-  /** Set when the response came from a persona (handoff). */
-  lastAgentName?: string;
   /** Attachment IDs (for user messages); used when loaded from history. */
   attachment_ids?: string[];
   /** Attachment meta for display (from history or after upload). */
   attachment_metas?: { id: string; originalName: string; mimeType: string }[];
-}
-
-export interface PersonaConfig {
-  id: string;
-  description: string;
-  responsibilities: string;
-  /** MCP connection IDs attached to this persona. */
-  allowed_connections: string[];
-  /** Installed skill IDs attached to this persona. */
-  allowed_skills: string[];
-  memory: { scope: string };
-  reporting: { on: string[] };
 }
 
 export interface AuditEntry {

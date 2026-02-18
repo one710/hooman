@@ -8,10 +8,9 @@ const debug = createDebug("hooman:config");
 
 const CONFIG_PATH = getWorkspaceConfigPath();
 
-/** Default configurable system instructions (personality, persona handoff). User can override in Settings. */
-export const DEFAULT_AGENT_INSTRUCTIONS = `You are Hooman, a digital concierge that operates on behalf of the user.
-Be conversational and human-first. Use memory context when provided to tailor and remember preferences.
-When a task fits a specialized persona (by role and capabilities), hand off to that persona to do it; otherwise respond yourself.`;
+/** Default configurable system instructions. User can override in Settings. */
+export const DEFAULT_AGENT_INSTRUCTIONS = `You are Hooman, a virtual identity capable of doing things yourself as needed.
+Be conversational and human-first. Use memory context when provided to tailor and remember preferences.`;
 
 /**
  * Static instructions always appended to the agent (not user-configurable).

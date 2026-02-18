@@ -64,7 +64,7 @@ export function registerInternalRoutes(app: Express, ctx: AppContext): void {
     }
     const body = req.body as {
       eventId: string;
-      message: { role: "assistant"; text: string; lastAgentName?: string };
+      message: { role: "assistant"; text: string };
     };
     if (
       !body ||

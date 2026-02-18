@@ -9,6 +9,8 @@ services:
       - /etc/ngrok.yml
     ports:
       - "4040:4040"
+    profiles:
+      - remote
     volumes:
       - ./ngrok.yml:/etc/ngrok.yml
     env_file:

@@ -12,7 +12,6 @@ let socketInstance: Socket | null = null;
 export interface ChatResultMessage {
   role: "assistant";
   text: string;
-  lastAgentName?: string;
 }
 
 export interface ChatResultPayload {

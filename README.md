@@ -4,9 +4,9 @@
 
 # Hooman
 
-**Your virtual workforce, one concierge.** 🧑‍💼
+**Your virtual identity.** 🧑‍💼
 
-Personas organize MCP connections and skills; you talk only to **Hooman**. Hooman is the concierge: they remember context, decide when to handle something themselves or hand off to a persona when a task fits, and keep you in control with approvals and a full audit trail.
+You talk only to **Hooman**. Hooman is a virtual identity: they remember context, can act and get things done as needed, use MCP connections and skills directly, and keep you in control with approvals and a full audit trail.
 
 </div>
 
@@ -20,10 +20,10 @@ Personas organize MCP connections and skills; you talk only to **Hooman**. Hooma
 
 ## Why Hooman? ✨
 
-You don't manage a dozen bots. You have **one conversation** with Hooman. Want a report drafted? A meeting summarized? Research done? You say it. Hooman either does it or hands off to a persona that can (fetch, filesystem, custom MCP servers, installed skills). You get one place to chat, schedule tasks, and see what happened—without talking to individual agents.
+You don't manage a dozen bots. You have **one conversation** with Hooman. Want a report drafted? A meeting summarized? Research done? You say it. Hooman uses MCP connections (fetch, filesystem, custom servers) and installed skills directly. You get one place to chat, schedule tasks, and see what happened.
 
 - **🚪 One front door** — Chat, schedule, and inspect everything through Hooman.
-- **🦸 Personas with superpowers** — Give each persona a role (e.g. researcher, writer) and attach MCP connections and skills. Hooman hands off when a task fits.
+- **🔌 MCP and skills** — Capabilities (MCP servers and skills) are attached directly to Hooman. Add connections and skills in the UI; Hooman uses them when relevant.
 - **🔀 Multiple LLM providers** — In Settings, choose an **LLM provider** (OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Google Generative AI, Google Vertex, Mistral, or DeepSeek) for chat and Mem0. Choose a **Transcription provider** (OpenAI, Azure, or Deepgram) for voice/audio messages (e.g. WhatsApp voice notes). Memory embeddings are generated locally (no API) via embeddings.js.
 - **🎛️ Under your control** — Kill switch, capability approvals, and an audit log so you see who did what and when.
 
@@ -31,14 +31,13 @@ You don't manage a dozen bots. You have **one conversation** with Hooman. Want a
 
 ## How it works ⚙️
 
-| Concept             | What it is                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **🤖 Hooman**       | The main agent. Reasons over memory, handles your messages and scheduled tasks, and hands off to personas when needed.                                  |
-| **👥 Personas**     | Role-based handoff targets you define (id, description, responsibilities). Each has specific MCP connections and skills. Hooman delegates work to them. |
-| **🔌 Capabilities** | MCP servers (fetch, time, filesystem, or your own) and skills. You assign which personas get which capabilities.                                        |
-| **🧠 Memory**       | mem0: in-memory vector store + SQLite history (memory.db) so Hooman can use past context.                                                               |
+| Concept             | What it is                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **🤖 Hooman**       | A virtual identity. Reasons over memory, handles messages and scheduled tasks, and uses MCP tools and skills directly as needed.           |
+| **🔌 Capabilities** | MCP servers (fetch, time, filesystem, or your own) and skills. Attached directly to Hooman; configure in the Capabilities and Settings UI. |
+| **🧠 Memory**       | mem0: in-memory vector store + SQLite history (memory.db) so Hooman can use past context.                                                  |
 
-You chat with Hooman; Hooman uses memory, may hand off to a persona, and responds. Scheduled tasks run the same way—at a set time, Hooman processes the task like a message (reasoning, handoff, audit).
+You chat with Hooman; Hooman uses memory, MCP tools, and skills, and responds. Scheduled tasks run the same way—at a set time, Hooman processes the task like a message (reasoning, tools, audit).
 
 ---
 
@@ -80,7 +79,7 @@ yarn start
 - **API** → http://localhost:3000
 - **Web UI** → http://localhost:5173
 
-Set your **LLM provider** and API key (or credentials) in **Settings**, then chat with Hooman and add Personas in the UI. Supported providers: OpenAI, Azure, Anthropic, Amazon Bedrock, Google, Google Vertex, Mistral, DeepSeek.
+Set your **LLM provider** and API key (or credentials) in **Settings**, then chat with Hooman. Configure MCP connections and skills in **Capabilities**. Supported providers: OpenAI, Azure, Anthropic, Amazon Bedrock, Google, Google Vertex, Mistral, DeepSeek.
 
 To stop: `npx pm2 stop ecosystem.config.cjs` (or `yarn stop`).
 
@@ -99,9 +98,9 @@ Create a `.env` from `.env.example` if you need to override defaults (e.g. `MCP_
 
 ---
 
-## Exposing completions 🌐
+## Exposing completions 🌐 (optional)
 
-To let external apps (e.g. ElevenLabs) call Hooman’s agent via the OpenAI-compatible chat completions endpoint, expose it with ngrok. Only `/v1/chat/completions` and `/chat/completions` are reachable over the tunnel; all other endpoints return 403 when the request comes from the public URL.
+Ngrok is **not** required for normal use. Use it only when you want to test the OpenAI-compatible chat completions API from external apps (e.g. ElevenLabs). Only `/v1/chat/completions` and `/chat/completions` are reachable over the tunnel; all other endpoints return 403 when the request comes from the public URL.
 
 1. **Run the API on the host** (e.g. `yarn dev:api` or `yarn start`) so it listens on port 3000.
 
@@ -113,10 +112,10 @@ To let external apps (e.g. ElevenLabs) call Hooman’s agent via the OpenAI-comp
 
    In `.env`, set `NGROK_AUTHTOKEN` (get it from [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken)). In `ngrok.yml`, set a reserved `domain` if you have one, or remove the `domain` line to use a random ngrok URL.
 
-3. **Start the ngrok tunnel:**
+3. **Start the ngrok tunnel** (uses the `remote` profile so it doesn’t run with a plain `docker compose up`):
 
    ```bash
-   docker compose up -d ngrok
+   docker compose --profile remote up -d ngrok
    ```
 
    The tunnel forwards to `host.docker.internal:3000`. The ngrok UI is at http://localhost:4040.

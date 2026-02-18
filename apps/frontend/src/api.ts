@@ -121,44 +121,6 @@ export async function sendMessage(
   return { eventId: data.eventId };
 }
 
-export async function getPersonas(): Promise<{
-  personas: import("./types").PersonaConfig[];
-}> {
-  const res = await fetch(`${BASE}/api/personas`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function createPersona(
-  persona: import("./types").PersonaConfig,
-): Promise<{ persona: import("./types").PersonaConfig }> {
-  const res = await fetch(`${BASE}/api/personas`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(persona),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function updatePersona(
-  id: string,
-  patch: Partial<import("./types").PersonaConfig>,
-): Promise<{ persona: import("./types").PersonaConfig }> {
-  const res = await fetch(`${BASE}/api/personas/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function deletePersona(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/personas/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-}
-
 export async function getAudit(): Promise<{
   entries: import("./types").AuditEntry[];
 }> {
@@ -173,7 +135,7 @@ export async function getKillSwitch(): Promise<{ enabled: boolean }> {
   return res.json();
 }
 
-/** Available capabilities from configured MCP connections (for Personas dropdown). */
+/** Available capabilities from configured MCP connections. */
 export async function getCapabilitiesAvailable(): Promise<{
   capabilities: { integrationId: string; capability: string }[];
 }> {

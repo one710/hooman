@@ -75,6 +75,15 @@
     "@ai-sdk/provider" "3.0.8"
     "@ai-sdk/provider-utils" "4.0.15"
 
+"@ai-sdk/mcp@^1.0.0":
+  version "1.0.21"
+  resolved "https://registry.npmmirror.com/@ai-sdk/mcp/-/mcp-1.0.21.tgz#b0742e6c59bcebde890cb8dcb12af8b50148131b"
+  integrity sha512-dRX2X6GDadZNpiylNnw0HP7zJC8ggVOOJV/JtxuF6CgtP8CKnc7a/wEzpUw1m/4AGdD3mTDhKnKFwC4y10a8FQ==
+  dependencies:
+    "@ai-sdk/provider" "3.0.8"
+    "@ai-sdk/provider-utils" "4.0.15"
+    pkce-challenge "^5.0.0"
+
 "@ai-sdk/mistral@^3.0.20":
   version "3.0.20"
   resolved "https://registry.yarnpkg.com/@ai-sdk/mistral/-/mistral-3.0.20.tgz#b0b9d402520fb13011309e1e725a14e9b9b9a12e"
@@ -684,28 +693,6 @@
     zod "^3.25.0 || ^4.0.0"
     zod-to-json-schema "^3.24.1"
 
-"@modelcontextprotocol/sdk@^1.25.2":
-  version "1.25.3"
-  resolved "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.25.3.tgz"
-  integrity sha512-vsAMBMERybvYgKbg/l4L1rhS7VXV1c0CtyJg72vwxONVX0l4ZfKVAnZEWTQixJGTzKnELjQ59e4NbdFDALRiAQ==
-  dependencies:
-    "@hono/node-server" "^1.19.9"
-    ajv "^8.17.1"
-    ajv-formats "^3.0.1"
-    content-type "^1.0.5"
-    cors "^2.8.5"
-    cross-spawn "^7.0.5"
-    eventsource "^3.0.2"
-    eventsource-parser "^3.0.0"
-    express "^5.0.1"
-    express-rate-limit "^7.5.0"
-    jose "^6.1.1"
-    json-schema-typed "^8.0.2"
-    pkce-challenge "^5.0.0"
-    raw-body "^3.0.0"
-    zod "^3.25 || ^4.0"
-    zod-to-json-schema "^3.25.0"
-
 "@modelcontextprotocol/sdk@^1.26.0":
   version "1.26.0"
   resolved "https://registry.yarnpkg.com/@modelcontextprotocol/sdk/-/sdk-1.26.0.tgz#5b35d73062125f126cc70b0be83cbab53bcdde74"
@@ -795,65 +782,6 @@
   dependencies:
     mkdirp "^1.0.4"
     rimraf "^3.0.2"
-
-"@openai/agents-core@0.4.10":
-  version "0.4.10"
-  resolved "https://registry.yarnpkg.com/@openai/agents-core/-/agents-core-0.4.10.tgz#2dc2b68287411614cfab5104667963b4119bacbd"
-  integrity sha512-U2uu22OZGFZ53Ogm5Qtzymg1Oc1FFNdkh+fg0QWDJ7mERQU5G4LzhbTiwS/jylVgKPj74e2uBb8oj/X5rHwxDQ==
-  dependencies:
-    debug "^4.4.0"
-    openai "^6.20.0"
-  optionalDependencies:
-    "@modelcontextprotocol/sdk" "^1.26.0"
-
-"@openai/agents-core@0.4.5":
-  version "0.4.5"
-  resolved "https://registry.npmjs.org/@openai/agents-core/-/agents-core-0.4.5.tgz"
-  integrity sha512-/eaXhWykCvlq9IPDfpeMREj9QK7uyOzMbg/4rWXdQF7wwCRQqRhhK8sQy6mbXZowAivurjtb0hdQDHMhbRYnBA==
-  dependencies:
-    debug "^4.4.0"
-    openai "^6"
-  optionalDependencies:
-    "@modelcontextprotocol/sdk" "^1.25.2"
-
-"@openai/agents-extensions@^0.4.10":
-  version "0.4.10"
-  resolved "https://registry.yarnpkg.com/@openai/agents-extensions/-/agents-extensions-0.4.10.tgz#890668a5d2c0a5bb55b09b143ab4284729e91f3f"
-  integrity sha512-5pOeoP1tdTd1gTeqwFlW0QQqHE/DwkJ3Xd/axj4iw/bHQomWrevu+EqmFjywvKce65Rmb90HRckx7TpkvOdnbg==
-  dependencies:
-    "@openai/agents-core" "0.4.10"
-    "@types/ws" "^8.18.1"
-    debug "^4.4.0"
-
-"@openai/agents-openai@0.4.5":
-  version "0.4.5"
-  resolved "https://registry.npmjs.org/@openai/agents-openai/-/agents-openai-0.4.5.tgz"
-  integrity sha512-FdAmSlCEoLAz4LnonZe/FZ9InJf2hQG4rQcLbeqhCyi+GDj77IqQz40KPb3gcoaSMLi3bv5dlbkrXS/3TNOcMg==
-  dependencies:
-    "@openai/agents-core" "0.4.5"
-    debug "^4.4.0"
-    openai "^6"
-
-"@openai/agents-realtime@0.4.5":
-  version "0.4.5"
-  resolved "https://registry.npmjs.org/@openai/agents-realtime/-/agents-realtime-0.4.5.tgz"
-  integrity sha512-uq9vgD0yqLXML5L5B72Gm9AbC6hNofw+MT3egb9gWrB2J03vFUgotdB2LfxEGI1rHU2wOob+mr5MDomJu/jhGA==
-  dependencies:
-    "@openai/agents-core" "0.4.5"
-    "@types/ws" "^8.18.1"
-    debug "^4.4.0"
-    ws "^8.18.1"
-
-"@openai/agents@^0.4.5":
-  version "0.4.5"
-  resolved "https://registry.npmjs.org/@openai/agents/-/agents-0.4.5.tgz"
-  integrity sha512-FWE7OM10Kb9Mlqlqh9riiQPI339ssPf6g830/rQKQy3dIEWutqd+L8yGcp95SZ05fKptS2R8OVcP/sBYx98r4g==
-  dependencies:
-    "@openai/agents-core" "0.4.5"
-    "@openai/agents-openai" "0.4.5"
-    "@openai/agents-realtime" "0.4.5"
-    debug "^4.4.0"
-    openai "^6"
 
 "@opentelemetry/api@1.9.0":
   version "1.9.0"
@@ -3291,11 +3219,6 @@ expand-template@^2.0.3:
   resolved "https://registry.npmjs.org/expand-template/-/expand-template-2.0.3.tgz"
   integrity sha512-XYfuKMvj4O35f/pOXLObndIRvyQ+/+6AhODh+OKWj9S9498pHHn/IMszH+gt0fBCRWMNfk1ZSp5x3AifmnI2vg==
 
-express-rate-limit@^7.5.0:
-  version "7.5.1"
-  resolved "https://registry.npmjs.org/express-rate-limit/-/express-rate-limit-7.5.1.tgz"
-  integrity sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==
-
 express-rate-limit@^8.2.1:
   version "8.2.1"
   resolved "https://registry.yarnpkg.com/express-rate-limit/-/express-rate-limit-8.2.1.tgz#ec75fdfe280ecddd762b8da8784c61bae47d7f7f"
@@ -3303,7 +3226,7 @@ express-rate-limit@^8.2.1:
   dependencies:
     ip-address "10.0.1"
 
-express@^5.0.0, express@^5.0.1, express@^5.2.1:
+express@^5.0.0, express@^5.2.1:
   version "5.2.1"
   resolved "https://registry.npmjs.org/express/-/express-5.2.1.tgz"
   integrity sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==
@@ -4217,7 +4140,7 @@ jiti@^1.21.7:
   resolved "https://registry.npmjs.org/jiti/-/jiti-1.21.7.tgz"
   integrity sha512-/imKNG4EbWNrVjoNC/1H5/9GFy+tqjGBHCaSsN+P2RnPqjsLmv6UD3Ej+Kj8nBWaRAwyk7kK5ZUc+OEatnTR3A==
 
-jose@^6.1.1, jose@^6.1.3:
+jose@^6.1.3:
   version "6.1.3"
   resolved "https://registry.npmjs.org/jose/-/jose-6.1.3.tgz"
   integrity sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==
@@ -5599,15 +5522,10 @@ openai@^4.24.1, openai@^4.93.0:
     formdata-node "^4.3.2"
     node-fetch "^2.6.7"
 
-openai@^6, openai@^6.17.0:
+openai@^6.17.0:
   version "6.17.0"
   resolved "https://registry.npmjs.org/openai/-/openai-6.17.0.tgz"
   integrity sha512-NHRpPEUPzAvFOAFs9+9pC6+HCw/iWsYsKCMPXH5Kw7BpMxqd8g/A07/1o7Gx2TWtCnzevVRyKMRFqyiHyAlqcA==
-
-openai@^6.20.0:
-  version "6.22.0"
-  resolved "https://registry.yarnpkg.com/openai/-/openai-6.22.0.tgz#822abd533ba3656741df87e31d1d643520e77463"
-  integrity sha512-7Yvy17F33Bi9RutWbsaYt5hJEEJ/krRPOrwan+f9aCPuMat1WVsb2VNSII5W1EksKT6fF69TG/xj4XzodK3JZw==
 
 p-finally@^1.0.0:
   version "1.0.0"
@@ -7619,7 +7537,7 @@ ws@^7.0.0, ws@~7.5.10:
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.10.tgz#58b5c20dc281633f6c19113f39b349bd8bd558d9"
   integrity sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ==
 
-ws@^8, ws@^8.18.0, ws@^8.18.1, ws@^8.18.2, ws@^8.19.0:
+ws@^8, ws@^8.18.0, ws@^8.18.2, ws@^8.19.0:
   version "8.19.0"
   resolved "https://registry.npmjs.org/ws/-/ws-8.19.0.tgz"
   integrity sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==
@@ -7696,7 +7614,7 @@ zip-stream@^4.1.0:
     compress-commons "^4.1.2"
     readable-stream "^3.6.0"
 
-zod-to-json-schema@^3.24.1, zod-to-json-schema@^3.25.0, zod-to-json-schema@^3.25.1:
+zod-to-json-schema@^3.24.1, zod-to-json-schema@^3.25.1:
   version "3.25.1"
   resolved "https://registry.npmjs.org/zod-to-json-schema/-/zod-to-json-schema-3.25.1.tgz"
   integrity sha512-pM/SU9d3YAggzi6MtR4h7ruuQlqKtad8e9S0fmxcMi+ueAK5Korys/aWcV9LIIHTVbj01NdzxcnXSN+O74ZIVA==

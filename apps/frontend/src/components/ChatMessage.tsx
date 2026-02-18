@@ -57,13 +57,6 @@ export function ChatMessage({ message: m }: { message: ChatMessageType }) {
             ))}
           </div>
         )}
-        {m.role === "assistant" &&
-          m.lastAgentName &&
-          m.lastAgentName !== "Hooman" && (
-            <p className="mt-1.5 text-xs text-hooman-muted border-t border-hooman-border/50 pt-1.5">
-              Responded by: {m.lastAgentName}
-            </p>
-          )}
       </div>
     </div>
   );

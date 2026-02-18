@@ -4,7 +4,6 @@ import { registerInternalRoutes } from "./internal.js";
 import { registerSettingsRoutes } from "./settings.js";
 import { registerChatRoutes } from "./chat.js";
 import { registerCompletionsRoutes } from "./completions.js";
-import { registerPersonaRoutes } from "./personas.js";
 import { registerAuditRoutes } from "./audit.js";
 import { registerChannelRoutes } from "./channels.js";
 import { registerCapabilityRoutes } from "./capabilities.js";
@@ -17,7 +16,6 @@ export function registerRoutes(app: Express, ctx: AppContext): void {
   registerSettingsRoutes(app, ctx);
   registerChatRoutes(app, ctx);
   registerCompletionsRoutes(app, ctx);
-  registerPersonaRoutes(app, ctx);
   registerAuditRoutes(app, ctx);
   registerChannelRoutes(app, ctx);
   registerCapabilityRoutes(app, ctx);

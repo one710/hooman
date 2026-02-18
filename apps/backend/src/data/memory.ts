@@ -27,19 +27,15 @@ export interface IMemoryService {
     options?: {
       userId?: string;
       metadata?: Record<string, unknown>;
-      personaId?: string;
     },
   ): Promise<void>;
   search(
     query: string,
-    options?: { userId?: string; limit?: number; personaId?: string },
+    options?: { userId?: string; limit?: number },
   ): Promise<MemorySearchResult[]>;
-  getAll(options?: {
-    userId?: string;
-    personaId?: string;
-  }): Promise<MemorySearchResult[]>;
+  getAll(options?: { userId?: string }): Promise<MemorySearchResult[]>;
   delete(memoryId: string): Promise<void>;
-  deleteAll(options?: { userId?: string; personaId?: string }): Promise<void>;
+  deleteAll(options?: { userId?: string }): Promise<void>;
 }
 
 const DEFAULT_LLM_MODEL = "gpt-5.2";
@@ -106,7 +102,6 @@ class Mem0Adapter implements IMemoryService {
     options?: {
       userId?: string;
       metadata?: Record<string, unknown>;
-      personaId?: string;
     },
   ): Promise<void> {
     await this.mem.add(messages, {
@@ -118,7 +113,7 @@ class Mem0Adapter implements IMemoryService {
 
   async search(
     query: string,
-    options?: { userId?: string; limit?: number; personaId?: string },
+    options?: { userId?: string; limit?: number },
   ): Promise<MemorySearchResult[]> {
     const out = await this.mem.search(query, {
       userId: options?.userId ?? "default",
@@ -134,10 +129,7 @@ class Mem0Adapter implements IMemoryService {
     }));
   }
 
-  async getAll(options?: {
-    userId?: string;
-    personaId?: string;
-  }): Promise<MemorySearchResult[]> {
+  async getAll(options?: { userId?: string }): Promise<MemorySearchResult[]> {
     const out = await this.mem.getAll({ userId: options?.userId ?? "default" });
     const results = Array.isArray(out) ? out : (out?.results ?? []);
     return results.map(
@@ -159,10 +151,7 @@ class Mem0Adapter implements IMemoryService {
     await this.mem.delete(memoryId);
   }
 
-  async deleteAll(options?: {
-    userId?: string;
-    personaId?: string;
-  }): Promise<void> {
+  async deleteAll(options?: { userId?: string }): Promise<void> {
     await this.mem.deleteAll({ userId: options?.userId ?? "default" });
   }
 }

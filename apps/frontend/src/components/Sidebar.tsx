@@ -1,7 +1,6 @@
 import {
   MessageCircle,
   Radio,
-  Users,
   Clock,
   ClipboardList,
   Shield,
@@ -22,7 +21,6 @@ interface SidebarProps {
 const nav: { id: View; label: string; Icon: LucideIcon }[] = [
   { id: "chat", label: "Chat", Icon: MessageCircle },
   { id: "channels", label: "Channels", Icon: Radio },
-  { id: "personas", label: "Personas", Icon: Users },
   { id: "schedule", label: "Schedule", Icon: Clock },
   { id: "audit", label: "Audit log", Icon: ClipboardList },
   { id: "safety", label: "Safety", Icon: Shield },
@@ -44,7 +42,7 @@ export function Sidebar({ view, setView, open = true, onClose }: SidebarProps) {
         <div>
           <h1 className="text-lg font-semibold text-white">Hooman</h1>
           <p className="text-xs text-hooman-muted mt-0.5">
-            Your digital concierge
+            Your virtual identity
           </p>
         </div>
         {onClose && (
