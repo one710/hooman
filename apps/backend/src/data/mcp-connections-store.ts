@@ -4,6 +4,9 @@ import type {
   MCPConnectionHosted,
   MCPConnectionStreamableHttp,
   MCPConnectionStdio,
+  MCPOAuthConfig,
+  MCPOAuthTokens,
+  MCPOAuthClientInformation,
 } from "../types.js";
 
 const CONNECTION_TYPES = ["hosted", "streamable_http", "stdio"] as const;
@@ -35,6 +38,13 @@ function payloadToConnection(
       server_url: String(d.server_url ?? ""),
       require_approval: (d.require_approval as "always" | "never") ?? "never",
       streaming: d.streaming as boolean | undefined,
+      headers: d.headers as Record<string, string> | undefined,
+      oauth: d.oauth as MCPOAuthConfig | undefined,
+      oauth_tokens: d.oauth_tokens as MCPOAuthTokens | undefined,
+      oauth_code_verifier: d.oauth_code_verifier as string | undefined,
+      oauth_client_information: d.oauth_client_information as
+        | MCPOAuthClientInformation
+        | undefined,
       created_at: d.created_at as string | undefined,
     } as MCPConnectionHosted;
   }
@@ -49,6 +59,12 @@ function payloadToConnection(
       timeout_seconds: d.timeout_seconds as number | undefined,
       cache_tools_list: d.cache_tools_list as boolean | undefined,
       max_retry_attempts: d.max_retry_attempts as number | undefined,
+      oauth: d.oauth as MCPOAuthConfig | undefined,
+      oauth_tokens: d.oauth_tokens as MCPOAuthTokens | undefined,
+      oauth_code_verifier: d.oauth_code_verifier as string | undefined,
+      oauth_client_information: d.oauth_client_information as
+        | MCPOAuthClientInformation
+        | undefined,
       created_at: d.created_at as string | undefined,
     } as MCPConnectionStreamableHttp;
   }

@@ -28,12 +28,26 @@ import {
   getFullStaticAgentInstructionsAppend,
 } from "../config.js";
 import type { ScheduleService } from "../data/scheduler.js";
+import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import { setReloadFlag } from "../data/reload-flag.js";
+import { createOAuthProvider } from "../mcp/oauth-provider.js";
 import { env, BACKEND_ROOT } from "../env.js";
 import { join } from "path";
 import createDebug from "debug";
 
 const debug = createDebug("hooman:hooman-runner");
+const DEBUG_TOOL_LOG_MAX = 500; // max chars for args/result in logs
+
+function truncateForLog(value: unknown): string {
+  const s =
+    typeof value === "string"
+      ? value
+      : typeof value === "object" && value !== null
+        ? JSON.stringify(value)
+        : String(value);
+  if (s.length <= DEBUG_TOOL_LOG_MAX) return s;
+  return `${s.slice(0, DEBUG_TOOL_LOG_MAX)}… (${s.length} chars total)`;
+}
 
 const DEFAULT_CHAT_MODEL = "gpt-4o";
 const DEFAULT_MCP_CWD = env.MCP_STDIO_DEFAULT_CWD;
@@ -470,6 +484,7 @@ export interface HoomanRunnerSession {
 export async function createHoomanRunner(options?: {
   connections?: MCPConnection[];
   scheduleService?: ScheduleService;
+  mcpConnectionsStore?: MCPConnectionsStore;
   apiKey?: string;
   model?: string;
 }): Promise<HoomanRunnerSession> {
@@ -506,20 +521,39 @@ export async function createHoomanRunner(options?: {
             clients.push({ client, id: c.id });
           } else if (c.type === "streamable_http") {
             const http = c as MCPConnectionStreamableHttp;
+            const hasOAuth =
+              http.oauth?.redirect_uri && options?.mcpConnectionsStore;
             const client = await createMCPClient({
               transport: {
                 type: "http",
                 url: http.url,
                 headers: http.headers,
+                ...(hasOAuth && {
+                  authProvider: createOAuthProvider(
+                    c.id,
+                    options.mcpConnectionsStore!,
+                    http,
+                  ),
+                }),
               },
             });
             clients.push({ client, id: c.id });
           } else if (c.type === "hosted") {
             const hosted = c as MCPConnectionHosted;
+            const hasOAuth =
+              hosted.oauth?.redirect_uri && options?.mcpConnectionsStore;
             const client = await createMCPClient({
               transport: {
                 type: "http",
                 url: hosted.server_url,
+                headers: hosted.headers,
+                ...(hasOAuth && {
+                  authProvider: createOAuthProvider(
+                    c.id,
+                    options.mcpConnectionsStore!,
+                    hosted,
+                  ),
+                }),
               },
             });
             clients.push({ client, id: c.id });
@@ -626,7 +660,22 @@ export async function createHoomanRunner(options?: {
         stopWhen: stepCountIs(maxSteps),
         onStepFinish(step) {
           for (const toolCall of step.toolCalls ?? []) {
-            debug("Tool call: %s", toolCall.toolName);
+            debug(
+              "Tool call: %s args=%s",
+              toolCall.toolName,
+              truncateForLog((toolCall as { input?: unknown }).input),
+            );
+          }
+          for (const tr of step.toolResults ?? []) {
+            const resultPart = tr as {
+              toolName: string;
+              output?: unknown;
+            };
+            debug(
+              "Tool result: %s result=%s",
+              resultPart.toolName,
+              truncateForLog(resultPart.output),
+            );
           }
         },
       });

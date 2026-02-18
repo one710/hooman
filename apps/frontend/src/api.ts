@@ -250,6 +250,8 @@ export interface AppConfig {
   MISTRAL_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
   COMPLETIONS_API_KEY?: string;
+  /** Max input tokens (context window). 0 or unset = 100000 default. Conversation and memory are trimmed to stay under this. */
+  MAX_INPUT_TOKENS?: number;
 }
 
 export async function getConfig(): Promise<AppConfig> {
@@ -341,6 +343,26 @@ export async function deleteMCPConnection(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
+}
+
+/** OAuth callback URL for MCP (to prefill redirect_uri). */
+export async function getOAuthCallbackUrl(): Promise<{ callbackUrl: string }> {
+  const res = await fetch(`${BASE}/api/mcp/oauth/callback-url`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/** Start OAuth flow for an MCP connection; returns URL to open or already_authorized. */
+export async function startMCPOAuth(
+  connectionId: string,
+): Promise<{ authorizationUrl: string } | { status: "already_authorized" }> {
+  const res = await fetch(`${BASE}/api/mcp/oauth/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 // Skills (list from project .agents/skills; add/remove via npx skills CLI)

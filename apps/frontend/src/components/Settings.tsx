@@ -84,6 +84,7 @@ export function Settings() {
         MISTRAL_API_KEY: form.MISTRAL_API_KEY,
         DEEPSEEK_API_KEY: form.DEEPSEEK_API_KEY,
         COMPLETIONS_API_KEY: form.COMPLETIONS_API_KEY,
+        MAX_INPUT_TOKENS: form.MAX_INPUT_TOKENS,
       });
       setForm({ ...updated });
       setMessage({
@@ -163,6 +164,36 @@ export function Settings() {
                   rows={14}
                   className="bg-hooman-surface focus:ring-offset-hooman-surface font-mono text-sm"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">
+                  Max input tokens (context window)
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.MAX_INPUT_TOKENS ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((f) =>
+                      f
+                        ? {
+                            ...f,
+                            MAX_INPUT_TOKENS:
+                              v === ""
+                                ? undefined
+                                : Math.max(0, Number(v) || 0),
+                          }
+                        : f,
+                    );
+                  }}
+                  placeholder="e.g. 200000"
+                  className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                />
+                <p className="text-xs text-hooman-muted mt-1">
+                  e.g. 200000. 0 or empty = 100000 tokens default. Conversation
+                  and memory are trimmed to stay under this.
+                </p>
               </div>
             </div>
           </div>

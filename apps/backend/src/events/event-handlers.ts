@@ -9,6 +9,11 @@ import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import type { ScheduleService } from "../data/scheduler.js";
 import type { AuditLog } from "../audit.js";
 import { createHoomanRunner } from "../agents/hooman-runner.js";
+import {
+  trimContextToTokenBudget,
+  RESERVED_TOKENS,
+} from "../agents/trim-context.js";
+import { getConfig } from "../config.js";
 import type { RawDispatchInput, ChannelMeta } from "../types.js";
 
 const debug = createDebug("hooman:event-handlers");
@@ -42,7 +47,8 @@ function buildChannelContext(
   return lines.join("\n");
 }
 
-const CHAT_THREAD_LIMIT = 30;
+const CHAT_THREAD_LIMIT = 20;
+
 /** Max time to wait for runChat. After this we deliver a timeout message so the UI doesn't stay on "Thinking...". */
 const CHAT_TIMEOUT_MS = 90_000;
 
@@ -131,16 +137,24 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     let assistantText = "";
     try {
       const recent = await context.getRecentMessages(userId, CHAT_THREAD_LIMIT);
-      const thread = recent.map((m) => ({ role: m.role, content: m.text }));
+      let thread = recent.map((m) => ({ role: m.role, content: m.text }));
       const memories = await context.search(text, { userId, limit: 5 });
-      const memoryContext =
+      let memoryContext =
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
+      const effectiveMax = getConfig().MAX_INPUT_TOKENS ?? 100_000;
+      ({ thread, memoryContext } = trimContextToTokenBudget(
+        thread,
+        memoryContext,
+        effectiveMax,
+        RESERVED_TOKENS,
+      ));
       const connections = await mcpConnectionsStore.getAll();
       const session = await createHoomanRunner({
         connections,
         scheduleService: scheduler,
+        mcpConnectionsStore,
       });
       try {
         const channelContext = buildChannelContext(
@@ -253,14 +267,22 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         userId: "default",
         limit: 5,
       });
-      const memoryContext =
+      let memoryContext =
         memories.length > 0
           ? memories.map((m) => `- ${m.memory}`).join("\n")
           : "";
+      const effectiveMax = getConfig().MAX_INPUT_TOKENS ?? 100_000;
+      ({ memoryContext } = trimContextToTokenBudget(
+        [],
+        memoryContext,
+        effectiveMax,
+        RESERVED_TOKENS,
+      ));
       const connections = await mcpConnectionsStore.getAll();
       const session = await createHoomanRunner({
         connections,
         scheduleService: scheduler,
+        mcpConnectionsStore,
       });
       try {
         const { finalOutput } = await session.runChat([], text, {

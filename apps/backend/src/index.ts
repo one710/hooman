@@ -12,6 +12,7 @@ import type { ScheduleService, ScheduledTask } from "./data/scheduler.js";
 import { randomUUID } from "crypto";
 import type { ResponsePayload } from "./audit.js";
 import { getConfig, loadPersisted } from "./config.js";
+import { loadPrompts } from "./prompts.js";
 import { registerRoutes } from "./routes/index.js";
 import { localhostOnly } from "./middleware/localhost-only.js";
 import { initDb } from "./data/db.js";
@@ -41,6 +42,7 @@ async function main() {
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
   mkdirSync(WORKSPACE_MCPCWD, { recursive: true });
 
+  await loadPrompts();
   await loadPersisted();
 
   const redisUrl = env.REDIS_URL;

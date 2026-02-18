@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import createDebug from "debug";
 import { randomUUID } from "crypto";
+import { auth } from "@ai-sdk/mcp";
 import type { AppContext } from "./helpers.js";
 import { getParam } from "./helpers.js";
 import type {
@@ -15,8 +16,69 @@ import {
   addSkill,
   removeSkills,
 } from "../agents/skills-cli.js";
+import {
+  createOAuthProvider,
+  getAndClearPendingAuthUrl,
+} from "../mcp/oauth-provider.js";
+import { env } from "../env.js";
 
 const debug = createDebug("hooman:routes:capabilities");
+
+function getMcpServerUrl(
+  c: MCPConnectionHosted | MCPConnectionStreamableHttp,
+): string {
+  return c.type === "hosted" ? c.server_url : c.url;
+}
+
+/**
+ * URL to pass to auth() for discovery and DCR. When the user has set an explicit
+ * authorization server URL, use it so discovery/register hit the auth server instead
+ * of the MCP endpoint (which often returns 404 for /.well-known and /register).
+ */
+function getOAuthServerUrlForAuth(
+  c: MCPConnectionHosted | MCPConnectionStreamableHttp,
+): string {
+  const override = c.oauth?.authorization_server_url?.trim();
+  return override && override.length > 0 ? override : getMcpServerUrl(c);
+}
+
+function getOAuthCallbackUrl(): string {
+  const base = env.API_BASE_URL.replace(/\/$/, "");
+  return `${base}/api/mcp/oauth/callback`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function maskConnectionForResponse(
+  c: MCPConnection,
+): MCPConnection & { oauth_has_tokens?: boolean } {
+  if (c.type !== "streamable_http" && c.type !== "hosted") {
+    return c;
+  }
+  const http = c as MCPConnectionHosted | MCPConnectionStreamableHttp;
+  const hasTokens = Boolean(http.oauth_tokens?.access_token);
+  const out: MCPConnection & { oauth_has_tokens?: boolean } = {
+    ...http,
+    oauth_has_tokens: http.oauth ? hasTokens : undefined,
+  };
+  const outRecord = out as unknown as Record<string, unknown>;
+  delete outRecord.oauth_tokens;
+  delete outRecord.oauth_code_verifier;
+  delete outRecord.oauth_client_information;
+  if (out.oauth?.client_secret) {
+    out.oauth = { ...out.oauth, client_secret: "***" };
+  }
+  if (out.headers?.Authorization) {
+    out.headers = { ...out.headers, Authorization: "Bearer ***" };
+  }
+  return out;
+}
 
 export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
   const { mcpConnectionsStore } = ctx;
@@ -38,7 +100,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
 
   app.get("/api/mcp/connections", async (_req: Request, res: Response) => {
     const connections = await mcpConnectionsStore.getAll();
-    res.json({ connections });
+    res.json({ connections: connections.map(maskConnectionForResponse) });
   });
 
   app.post(
@@ -68,6 +130,8 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
           server_url: serverUrl,
           require_approval: body.require_approval ?? "never",
           streaming: body.streaming ?? false,
+          headers: body.headers,
+          oauth: body.oauth,
           created_at,
         };
         conn = c;
@@ -81,6 +145,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
           timeout_seconds: body.timeout_seconds,
           cache_tools_list: body.cache_tools_list ?? true,
           max_retry_attempts: body.max_retry_attempts,
+          oauth: body.oauth,
           created_at,
         };
         conn = c;
@@ -109,7 +174,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       await mcpConnectionsStore.addOrUpdate(conn);
-      res.status(201).json({ connection: conn });
+      res.status(201).json({ connection: maskConnectionForResponse(conn) });
     },
   );
 
@@ -128,8 +193,42 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
         ...patch,
         id: existing.id,
       } as MCPConnection;
+      if (merged.type === "streamable_http" || merged.type === "hosted") {
+        const existingHttp = existing as
+          | MCPConnectionHosted
+          | MCPConnectionStreamableHttp;
+        const mergedHttp = merged as
+          | MCPConnectionHosted
+          | MCPConnectionStreamableHttp;
+        if (
+          mergedHttp.headers?.Authorization === "Bearer ***" &&
+          existingHttp.headers?.Authorization
+        ) {
+          mergedHttp.headers = {
+            ...mergedHttp.headers,
+            Authorization: existingHttp.headers.Authorization,
+          };
+        }
+        if (
+          mergedHttp.oauth?.client_secret === "***" &&
+          existingHttp.oauth?.client_secret
+        ) {
+          mergedHttp.oauth = {
+            ...mergedHttp.oauth,
+            client_secret: existingHttp.oauth.client_secret,
+          };
+        }
+        const patchHttp = patch as Partial<MCPConnectionHosted>;
+        if (patchHttp.oauth_tokens === undefined)
+          mergedHttp.oauth_tokens = existingHttp.oauth_tokens;
+        if (patchHttp.oauth_code_verifier === undefined)
+          mergedHttp.oauth_code_verifier = existingHttp.oauth_code_verifier;
+        if (patchHttp.oauth_client_information === undefined)
+          mergedHttp.oauth_client_information =
+            existingHttp.oauth_client_information;
+      }
       await mcpConnectionsStore.addOrUpdate(merged);
-      res.json({ connection: merged });
+      res.json({ connection: maskConnectionForResponse(merged) });
     },
   );
 
@@ -142,6 +241,150 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       res.status(204).send();
+    },
+  );
+
+  app.get("/api/mcp/oauth/callback-url", (_req: Request, res: Response) => {
+    res.json({ callbackUrl: getOAuthCallbackUrl() });
+  });
+
+  app.get(
+    "/api/mcp/oauth/callback",
+    async (req: Request, res: Response): Promise<void> => {
+      const code =
+        typeof req.query.code === "string" ? req.query.code : undefined;
+      const state =
+        typeof req.query.state === "string" ? req.query.state : undefined;
+      const errorParam =
+        typeof req.query.error === "string" ? req.query.error : undefined;
+      if (errorParam) {
+        res
+          .status(400)
+          .send(
+            `<!DOCTYPE html><html><body><p>Authorization failed: ${escapeHtml(errorParam)}</p></body></html>`,
+          );
+        return;
+      }
+      if (!code || !state) {
+        res
+          .status(400)
+          .send(
+            "<!DOCTYPE html><html><body><p>Missing code or state.</p></body></html>",
+          );
+        return;
+      }
+      const connectionId = state;
+      const existing = await mcpConnectionsStore.getById(connectionId);
+      if (
+        !existing ||
+        (existing.type !== "streamable_http" && existing.type !== "hosted") ||
+        !existing.oauth?.redirect_uri
+      ) {
+        res
+          .status(400)
+          .send(
+            "<!DOCTYPE html><html><body><p>Invalid state or connection.</p></body></html>",
+          );
+        return;
+      }
+      const serverUrl = getOAuthServerUrlForAuth(existing);
+      const provider = createOAuthProvider(
+        connectionId,
+        mcpConnectionsStore,
+        existing,
+      );
+      try {
+        const result = await auth(provider, {
+          serverUrl,
+          authorizationCode: code,
+        });
+        if (result !== "AUTHORIZED") {
+          res
+            .status(400)
+            .send(
+              "<!DOCTYPE html><html><body><p>Token exchange did not complete.</p></body></html>",
+            );
+          return;
+        }
+        const updated = await mcpConnectionsStore.getById(connectionId);
+        if (
+          updated &&
+          (updated.type === "streamable_http" || updated.type === "hosted") &&
+          updated.oauth_code_verifier
+        ) {
+          const cleared = { ...updated, oauth_code_verifier: undefined };
+          await mcpConnectionsStore.addOrUpdate(cleared);
+        }
+        res.send(
+          "<!DOCTYPE html><html><body><p>Authorization successful. You can close this window.</p></body></html>",
+        );
+      } catch (err) {
+        debug("OAuth callback error: %o", err);
+        res
+          .status(500)
+          .send(
+            "<!DOCTYPE html><html><body><p>Authorization failed. Please try again.</p></body></html>",
+          );
+      }
+    },
+  );
+
+  app.post(
+    "/api/mcp/oauth/start",
+    async (req: Request, res: Response): Promise<void> => {
+      const connectionId =
+        typeof req.body?.connectionId === "string"
+          ? req.body.connectionId.trim()
+          : "";
+      if (!connectionId) {
+        res.status(400).json({ error: "Missing connectionId." });
+        return;
+      }
+      const existing = await mcpConnectionsStore.getById(connectionId);
+      if (
+        !existing ||
+        (existing.type !== "streamable_http" && existing.type !== "hosted") ||
+        !existing.oauth?.redirect_uri
+      ) {
+        res.status(400).json({
+          error: "Connection not found or not OAuth-enabled.",
+        });
+        return;
+      }
+      const serverUrl = getOAuthServerUrlForAuth(existing);
+      const provider = createOAuthProvider(
+        connectionId,
+        mcpConnectionsStore,
+        existing,
+      );
+      try {
+        const result = await auth(provider, {
+          serverUrl,
+        });
+        if (result === "AUTHORIZED") {
+          res.json({ status: "already_authorized" });
+          return;
+        }
+        const authorizationUrl = getAndClearPendingAuthUrl(connectionId);
+        if (!authorizationUrl) {
+          res.status(500).json({
+            error: "Authorization URL not available. Please try again.",
+          });
+          return;
+        }
+        res.json({ authorizationUrl });
+      } catch (err) {
+        debug("OAuth start error: %o", err);
+        let msg = (err as Error).message || "OAuth start failed.";
+        if (
+          msg.includes("404") &&
+          (msg.includes("Not Found") || msg.includes("Invalid OAuth error"))
+        ) {
+          msg +=
+            ' If your MCP server uses a separate OAuth server, set "Authorization server URL" in the connection form to that server (e.g. the OAuth provider base URL). Otherwise use a pre-registered client (Client ID and optional Client secret) so DCR is skipped.';
+        }
+        res.status(500).json({ error: msg });
+      }
     },
   );
 

@@ -1705,6 +1705,11 @@ aggregate-error@^3.0.0:
     clean-stack "^2.0.0"
     indent-string "^4.0.0"
 
+ai-tokenizer@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.npmmirror.com/ai-tokenizer/-/ai-tokenizer-1.0.6.tgz#4c6612573e97fafb473e5ccfdfb52f37923d7c2b"
+  integrity sha512-GaakQFxen0pRH/HIA4v68ZM40llCH27HUYUSBLK+gVuZ57e53pYJe1xFvSTj4sJJjbWU92m1X6NjPWyeWkFDow==
+
 ai@^6.0.86:
   version "6.0.86"
   resolved "https://registry.yarnpkg.com/ai/-/ai-6.0.86.tgz#cee563e8a0d9b87f8fdda764f190e7dd3f81ba00"

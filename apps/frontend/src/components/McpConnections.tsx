@@ -17,6 +17,8 @@ import {
   createMCPConnection,
   updateMCPConnection,
   deleteMCPConnection,
+  getOAuthCallbackUrl,
+  startMCPOAuth,
 } from "../api";
 
 const CONNECTION_TYPE_OPTIONS: {
@@ -50,7 +52,34 @@ export function McpConnections() {
   const [envEntries, setEnvEntries] = useState<
     { key: string; value: string }[]
   >([]);
+  const [bearerToken, setBearerToken] = useState("");
+  const [headerEntries, setHeaderEntries] = useState<
+    { key: string; value: string }[]
+  >([]);
+  const [oauthCallbackUrl, setOAuthCallbackUrl] = useState("");
+  const [oauthEnabled, setOAuthEnabled] = useState(false);
+  const [oauthRedirectUri, setOAuthRedirectUri] = useState("");
+  const [oauthClientId, setOAuthClientId] = useState("");
+  const [oauthClientSecret, setOAuthClientSecret] = useState("");
+  const [oauthScope, setOAuthScope] = useState("");
+  const [oauthAuthServerUrl, setOAuthAuthServerUrl] = useState("");
+  const [oauthStartingId, setOAuthStartingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function buildHeaders(): Record<string, string> | undefined {
+    const custom = headerEntries
+      .filter((e) => e.key.trim() !== "")
+      .reduce(
+        (acc, e) => ({ ...acc, [e.key.trim()]: e.value }),
+        {} as Record<string, string>,
+      );
+    const withAuth =
+      bearerToken && bearerToken !== "***"
+        ? { ...custom, Authorization: `Bearer ${bearerToken}` }
+        : custom;
+    if (Object.keys(withAuth).length === 0) return undefined;
+    return withAuth;
+  }
 
   function load() {
     setLoading(true);
@@ -65,10 +94,30 @@ export function McpConnections() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (
+      editing !== null &&
+      (form.type === "hosted" || form.type === "streamable_http") &&
+      !oauthCallbackUrl
+    ) {
+      getOAuthCallbackUrl()
+        .then((r) => setOAuthCallbackUrl(r.callbackUrl))
+        .catch(() => {});
+    }
+  }, [editing, form.type, oauthCallbackUrl]);
+
   function startAdd() {
     setEditing("new");
     setArgsRaw("");
     setEnvEntries([]);
+    setBearerToken("");
+    setHeaderEntries([]);
+    setOAuthEnabled(false);
+    setOAuthRedirectUri("");
+    setOAuthClientId("");
+    setOAuthClientSecret("");
+    setOAuthScope("");
+    setOAuthAuthServerUrl("");
     setForm({
       type: "hosted",
       server_label: "",
@@ -87,8 +136,35 @@ export function McpConnections() {
           ? Object.entries(c.env).map(([key, value]) => ({ key, value }))
           : [],
       );
+      setBearerToken("");
+      setHeaderEntries([]);
+    } else if (c.type === "streamable_http" || c.type === "hosted") {
+      const headers = c.headers ?? {};
+      const auth = headers.Authorization ?? "";
+      setBearerToken(auth.replace(/^Bearer\s+/i, "") || "");
+      const rest = Object.entries(headers)
+        .filter(([k]) => k !== "Authorization")
+        .map(([key, value]) => ({ key, value }));
+      setHeaderEntries(rest);
+      const o = (c as MCPConnectionHosted | MCPConnectionStreamableHttp).oauth;
+      setOAuthEnabled(!!o);
+      setOAuthRedirectUri(o?.redirect_uri ?? "");
+      setOAuthClientId(o?.client_id ?? "");
+      setOAuthClientSecret(
+        o?.client_secret === "***" ? "***" : (o?.client_secret ?? ""),
+      );
+      setOAuthScope(o?.scope ?? "");
+      setOAuthAuthServerUrl(o?.authorization_server_url ?? "");
     } else {
       setEnvEntries([]);
+      setBearerToken("");
+      setHeaderEntries([]);
+      setOAuthEnabled(false);
+      setOAuthRedirectUri("");
+      setOAuthClientId("");
+      setOAuthClientSecret("");
+      setOAuthScope("");
+      setOAuthAuthServerUrl("");
     }
   }
 
@@ -100,10 +176,27 @@ export function McpConnections() {
     setError(null);
     try {
       const base = { id: form.id || crypto.randomUUID(), type: form.type };
+      if (
+        (form.type === "hosted" || form.type === "streamable_http") &&
+        oauthEnabled &&
+        !oauthRedirectUri.trim() &&
+        !oauthCallbackUrl
+      ) {
+        setError("Redirect URI is required for OAuth. Loading callback URL…");
+        return;
+      }
       if (form.type === "hosted") {
         if (!form.server_url?.trim()) {
           setError("Server URL is required for hosted MCP.");
           return;
+        }
+        let headers = buildHeaders();
+        if (
+          editing !== "new" &&
+          bearerToken === "***" &&
+          (form.headers?.Authorization ?? "").startsWith("Bearer ")
+        ) {
+          headers = { ...headers, Authorization: "Bearer ***" };
         }
         const conn: MCPConnectionHosted = {
           ...base,
@@ -112,19 +205,60 @@ export function McpConnections() {
           server_url: form.server_url.trim(),
           require_approval: form.require_approval ?? "never",
           streaming: form.streaming ?? false,
+          headers,
+          ...(oauthEnabled && {
+            oauth: {
+              redirect_uri: oauthRedirectUri.trim() || oauthCallbackUrl,
+              ...(oauthClientId.trim() && { client_id: oauthClientId.trim() }),
+              ...(oauthClientSecret &&
+                oauthClientSecret !== "***" && {
+                  client_secret: oauthClientSecret,
+                }),
+              ...(editing !== "new" &&
+                oauthClientSecret === "***" && { client_secret: "***" }),
+              ...(oauthScope.trim() && { scope: oauthScope.trim() }),
+              ...(oauthAuthServerUrl.trim() && {
+                authorization_server_url: oauthAuthServerUrl.trim(),
+              }),
+            },
+          }),
         };
         if (editing === "new") await createMCPConnection(conn);
         else await updateMCPConnection(conn.id, conn);
       } else if (form.type === "streamable_http") {
+        let headers = buildHeaders();
+        if (
+          editing !== "new" &&
+          bearerToken === "***" &&
+          (form.headers?.Authorization ?? "").startsWith("Bearer ")
+        ) {
+          headers = { ...headers, Authorization: "Bearer ***" };
+        }
         const conn: MCPConnectionStreamableHttp = {
           ...base,
           type: "streamable_http",
           name: form.name ?? "",
           url: form.url ?? "",
-          headers: form.headers,
+          headers,
           timeout_seconds: form.timeout_seconds,
           cache_tools_list: form.cache_tools_list ?? true,
           max_retry_attempts: form.max_retry_attempts,
+          ...(oauthEnabled && {
+            oauth: {
+              redirect_uri: oauthRedirectUri.trim() || oauthCallbackUrl,
+              ...(oauthClientId.trim() && { client_id: oauthClientId.trim() }),
+              ...(oauthClientSecret &&
+                oauthClientSecret !== "***" && {
+                  client_secret: oauthClientSecret,
+                }),
+              ...(editing !== "new" &&
+                oauthClientSecret === "***" && { client_secret: "***" }),
+              ...(oauthScope.trim() && { scope: oauthScope.trim() }),
+              ...(oauthAuthServerUrl.trim() && {
+                authorization_server_url: oauthAuthServerUrl.trim(),
+              }),
+            },
+          }),
         };
         if (editing === "new") await createMCPConnection(conn);
         else await updateMCPConnection(conn.id, conn);
@@ -230,7 +364,15 @@ export function McpConnections() {
               if (type === "stdio") {
                 setArgsRaw("");
                 setEnvEntries([]);
+                setOAuthEnabled(false);
+                setOAuthRedirectUri("");
+                setOAuthClientId("");
+                setOAuthClientSecret("");
+                setOAuthScope("");
+                setOAuthAuthServerUrl("");
               }
+              setBearerToken("");
+              setHeaderEntries([]);
               setForm((f) => ({
                 ...f,
                 type,
@@ -293,6 +435,121 @@ export function McpConnections() {
                   setForm((f) => ({ ...f, streaming: checked }))
                 }
               />
+              <Input
+                label="Bearer token (optional)"
+                placeholder="OAuth or API token for servers that require auth"
+                type="password"
+                value={bearerToken}
+                onChange={(e) => setBearerToken(e.target.value)}
+                autoComplete="off"
+              />
+              <div>
+                <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
+                  Custom headers (optional)
+                </div>
+                <div className="space-y-2">
+                  {headerEntries.map((entry, i) => (
+                    <div key={i} className="flex gap-2 items-center flex-wrap">
+                      <Input
+                        placeholder="Key"
+                        value={entry.key}
+                        onChange={(e) =>
+                          setHeaderEntries((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, key: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <Input
+                        placeholder="Value"
+                        value={entry.value}
+                        onChange={(e) =>
+                          setHeaderEntries((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, value: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        icon={<Trash2 />}
+                        aria-label="Remove header"
+                        onClick={() =>
+                          setHeaderEntries((prev) =>
+                            prev.filter((_, j) => j !== i),
+                          )
+                        }
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Plus />}
+                    onClick={() =>
+                      setHeaderEntries((prev) => [
+                        ...prev,
+                        { key: "", value: "" },
+                      ])
+                    }
+                  >
+                    Add header
+                  </Button>
+                </div>
+              </div>
+              <Checkbox
+                id="hosted-oauth"
+                label="Use OAuth (PKCE, optional DCR)"
+                checked={oauthEnabled}
+                onChange={(checked) => setOAuthEnabled(checked)}
+              />
+              {oauthEnabled && (
+                <div className="space-y-2 rounded-lg border border-hooman-border p-3 bg-hooman-bg/50">
+                  <Input
+                    label="Authorization server URL (optional)"
+                    placeholder="Override when discovery from MCP URL is not used"
+                    value={oauthAuthServerUrl}
+                    onChange={(e) => setOAuthAuthServerUrl(e.target.value)}
+                  />
+                  <Input
+                    label="Client ID (optional; leave empty for DCR)"
+                    placeholder="Pre-registered client or leave empty for dynamic registration"
+                    value={oauthClientId}
+                    onChange={(e) => setOAuthClientId(e.target.value)}
+                  />
+                  <Input
+                    label="Client secret (optional)"
+                    placeholder="For confidential clients"
+                    type="password"
+                    value={oauthClientSecret}
+                    onChange={(e) => setOAuthClientSecret(e.target.value)}
+                    autoComplete="off"
+                  />
+                  <Input
+                    label="Redirect URI"
+                    placeholder="Callback URL"
+                    value={oauthRedirectUri || oauthCallbackUrl}
+                    onChange={(e) => setOAuthRedirectUri(e.target.value)}
+                  />
+                  <Input
+                    label="Scope (optional)"
+                    placeholder="e.g. openid"
+                    value={oauthScope}
+                    onChange={(e) => setOAuthScope(e.target.value)}
+                  />
+                </div>
+              )}
             </>
           )}
           {form.type === "streamable_http" && (
@@ -313,6 +570,121 @@ export function McpConnections() {
                   setForm((f) => ({ ...f, url: e.target.value }))
                 }
               />
+              <Input
+                label="Bearer token (optional)"
+                placeholder="OAuth or API token for servers that require auth"
+                type="password"
+                value={bearerToken}
+                onChange={(e) => setBearerToken(e.target.value)}
+                autoComplete="off"
+              />
+              <div>
+                <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
+                  Custom headers (optional)
+                </div>
+                <div className="space-y-2">
+                  {headerEntries.map((entry, i) => (
+                    <div key={i} className="flex gap-2 items-center flex-wrap">
+                      <Input
+                        placeholder="Key"
+                        value={entry.key}
+                        onChange={(e) =>
+                          setHeaderEntries((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, key: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <Input
+                        placeholder="Value"
+                        value={entry.value}
+                        onChange={(e) =>
+                          setHeaderEntries((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, value: e.target.value } : p,
+                            ),
+                          )
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        icon={<Trash2 />}
+                        aria-label="Remove header"
+                        onClick={() =>
+                          setHeaderEntries((prev) =>
+                            prev.filter((_, j) => j !== i),
+                          )
+                        }
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Plus />}
+                    onClick={() =>
+                      setHeaderEntries((prev) => [
+                        ...prev,
+                        { key: "", value: "" },
+                      ])
+                    }
+                  >
+                    Add header
+                  </Button>
+                </div>
+              </div>
+              <Checkbox
+                id="http-oauth"
+                label="Use OAuth (PKCE, optional DCR)"
+                checked={oauthEnabled}
+                onChange={(checked) => setOAuthEnabled(checked)}
+              />
+              {oauthEnabled && (
+                <div className="space-y-2 rounded-lg border border-hooman-border p-3 bg-hooman-bg/50">
+                  <Input
+                    label="Authorization server URL (optional)"
+                    placeholder="Override when discovery from MCP URL is not used"
+                    value={oauthAuthServerUrl}
+                    onChange={(e) => setOAuthAuthServerUrl(e.target.value)}
+                  />
+                  <Input
+                    label="Client ID (optional; leave empty for DCR)"
+                    placeholder="Pre-registered client or leave empty for dynamic registration"
+                    value={oauthClientId}
+                    onChange={(e) => setOAuthClientId(e.target.value)}
+                  />
+                  <Input
+                    label="Client secret (optional)"
+                    placeholder="For confidential clients"
+                    type="password"
+                    value={oauthClientSecret}
+                    onChange={(e) => setOAuthClientSecret(e.target.value)}
+                    autoComplete="off"
+                  />
+                  <Input
+                    label="Redirect URI"
+                    placeholder="Callback URL"
+                    value={oauthRedirectUri || oauthCallbackUrl}
+                    onChange={(e) => setOAuthRedirectUri(e.target.value)}
+                  />
+                  <Input
+                    label="Scope (optional)"
+                    placeholder="e.g. openid"
+                    value={oauthScope}
+                    onChange={(e) => setOAuthScope(e.target.value)}
+                  />
+                </div>
+              )}
               <Input
                 label="Timeout (seconds)"
                 placeholder="10"
@@ -487,8 +859,55 @@ export function McpConnections() {
                   {c.command} {c.args?.join(" ")}
                 </p>
               )}
+              {(c.type === "hosted" || c.type === "streamable_http") &&
+                (c as MCPConnectionHosted | MCPConnectionStreamableHttp)
+                  .oauth && (
+                  <p className="text-xs mt-0.5">
+                    <span
+                      className={
+                        (c as MCPConnectionHosted | MCPConnectionStreamableHttp)
+                          .oauth_has_tokens
+                          ? "text-green-400"
+                          : "text-amber-400"
+                      }
+                    >
+                      OAuth:{" "}
+                      {(c as MCPConnectionHosted | MCPConnectionStreamableHttp)
+                        .oauth_has_tokens
+                        ? "connected"
+                        : "needs authorization"}
+                    </span>
+                  </p>
+                )}
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 items-center">
+              {(c.type === "hosted" || c.type === "streamable_http") &&
+                (c as MCPConnectionHosted | MCPConnectionStreamableHttp)
+                  .oauth && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      setOAuthStartingId(c.id);
+                      try {
+                        const result = await startMCPOAuth(c.id);
+                        if ("authorizationUrl" in result) {
+                          window.open(result.authorizationUrl, "_blank");
+                          setTimeout(() => load(), 3000);
+                        } else {
+                          load();
+                        }
+                      } catch (e) {
+                        setError((e as Error).message);
+                      } finally {
+                        setOAuthStartingId(null);
+                      }
+                    }}
+                    disabled={oauthStartingId !== null}
+                  >
+                    {oauthStartingId === c.id ? "Opening…" : "Connect"}
+                  </Button>
+                )}
               <Button
                 variant="ghost"
                 size="sm"

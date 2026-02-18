@@ -264,6 +264,30 @@ export type MCPRequireApproval =
   | "never"
   | Record<string, "always" | "never">;
 
+/** OAuth config for MCP HTTP connections. When present, connection uses full OAuth (PKCE, optional DCR). */
+export interface MCPOAuthConfig {
+  redirect_uri: string;
+  client_id?: string;
+  client_secret?: string;
+  scope?: string;
+  /** Override when discovery from MCP URL is not desired. */
+  authorization_server_url?: string;
+}
+
+/** Persisted OAuth tokens (internal to payload; do not expose in API). */
+export interface MCPOAuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+}
+
+/** Persisted client info from DCR or pre-registration (internal to payload; do not expose in API). */
+export interface MCPOAuthClientInformation {
+  client_id: string;
+  client_secret?: string;
+}
+
 export interface MCPConnectionHosted {
   id: string;
   type: "hosted";
@@ -275,6 +299,16 @@ export interface MCPConnectionHosted {
   require_approval: MCPRequireApproval;
   /** When true, use streaming for hosted MCP results. */
   streaming?: boolean;
+  /** Optional headers (e.g. Bearer token for OAuth). */
+  headers?: Record<string, string>;
+  /** When set, use OAuth (PKCE, optional DCR) for this connection. */
+  oauth?: MCPOAuthConfig;
+  /** Internal: persisted tokens. Do not expose in API. */
+  oauth_tokens?: MCPOAuthTokens;
+  /** Internal: PKCE code_verifier during flow. Do not expose in API. */
+  oauth_code_verifier?: string;
+  /** Internal: client from DCR or pre-reg. Do not expose in API. */
+  oauth_client_information?: MCPOAuthClientInformation;
   created_at?: string;
 }
 
@@ -287,6 +321,14 @@ export interface MCPConnectionStreamableHttp {
   timeout_seconds?: number;
   cache_tools_list?: boolean;
   max_retry_attempts?: number;
+  /** When set, use OAuth (PKCE, optional DCR) for this connection. */
+  oauth?: MCPOAuthConfig;
+  /** Internal: persisted tokens. Do not expose in API. */
+  oauth_tokens?: MCPOAuthTokens;
+  /** Internal: PKCE code_verifier during flow. Do not expose in API. */
+  oauth_code_verifier?: string;
+  /** Internal: client from DCR or pre-reg. Do not expose in API. */
+  oauth_client_information?: MCPOAuthClientInformation;
   created_at?: string;
 }
 
