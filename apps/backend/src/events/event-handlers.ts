@@ -280,9 +280,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         await auditLog.appendAuditEntry({
           type: "scheduled_task",
           payload: {
-            execute_at: payload.execute_at,
             intent: payload.intent,
             context: payload.context,
+            ...(payload.execute_at ? { execute_at: payload.execute_at } : {}),
+            ...(payload.cron ? { cron: payload.cron } : {}),
           },
         });
         await auditLog.appendAuditEntry({
@@ -307,9 +308,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       await auditLog.appendAuditEntry({
         type: "scheduled_task",
         payload: {
-          execute_at: payload.execute_at,
           intent: payload.intent,
           context: payload.context,
+          ...(payload.execute_at ? { execute_at: payload.execute_at } : {}),
+          ...(payload.cron ? { cron: payload.cron } : {}),
           error: msg,
         },
       });

@@ -2,9 +2,10 @@ import { getPrisma } from "./db.js";
 
 export interface ScheduledTaskDoc {
   id: string;
-  execute_at: string;
+  execute_at?: string;
   intent: string;
   context: Record<string, unknown>;
+  cron?: string;
 }
 
 export interface ScheduleStore {
@@ -31,23 +32,33 @@ export async function initScheduleStore(): Promise<ScheduleStore> {
   return {
     async getAll(): Promise<ScheduledTaskDoc[]> {
       const rows = await prisma.schedule.findMany({
-        orderBy: { execute_at: "asc" },
+        orderBy: [{ execute_at: "asc" }, { id: "asc" }],
       });
-      return rows.map((r) => ({
-        id: r.id,
-        execute_at: r.execute_at,
-        intent: r.intent,
-        context: parseContext(r.context),
-      }));
+      return rows.map((r): ScheduledTaskDoc => {
+        const cronRaw = (r as { cron?: string | null }).cron;
+        const cron = cronRaw != null && cronRaw !== "" ? cronRaw : undefined;
+        const executeAt =
+          (r as { execute_at?: string | null }).execute_at ?? undefined;
+        return {
+          id: r.id,
+          ...(executeAt !== undefined && executeAt !== ""
+            ? { execute_at: executeAt }
+            : {}),
+          intent: r.intent,
+          context: parseContext(r.context),
+          ...(cron !== undefined ? { cron } : {}),
+        };
+      });
     },
 
     async add(task: ScheduledTaskDoc): Promise<void> {
       await prisma.schedule.create({
         data: {
           id: task.id,
-          execute_at: task.execute_at,
           intent: task.intent,
           context: JSON.stringify(task.context ?? {}),
+          execute_at: task.execute_at ?? null,
+          cron: task.cron ?? null,
         },
       });
     },

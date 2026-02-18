@@ -7,9 +7,10 @@
 
 export interface ScheduledTask {
   id: string;
-  execute_at: string; // ISO
+  execute_at?: string; // ISO; required for one-shot, absent for recurring
   intent: string;
   context: Record<string, unknown>;
+  cron?: string; // when set, task is recurring
 }
 
 /** API-facing schedule CRUD. Implemented by the API using ScheduleStore; cron worker loads from store and runs jobs. */

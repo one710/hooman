@@ -295,7 +295,7 @@ function buildScheduleTools(scheduleService: ScheduleService) {
   return {
     list_scheduled_tasks: tool({
       description:
-        "List all scheduled tasks for the user. Returns each task's id, execute_at (ISO time), intent, and optional context. Use this to see what is already scheduled before creating or canceling tasks.",
+        "List all scheduled tasks for the user. Returns each task's id, execute_at (ISO time or placeholder for recurring), optional cron (recurring expression), intent, and optional context. Use this to see what is already scheduled before creating or canceling tasks.",
       inputSchema: jsonSchema({
         type: "object",
         properties: {},
@@ -308,9 +308,10 @@ function buildScheduleTools(scheduleService: ScheduleService) {
         return JSON.stringify(
           tasks.map((t) => ({
             id: t.id,
-            execute_at: t.execute_at,
             intent: t.intent,
             context: t.context,
+            ...(t.execute_at ? { execute_at: t.execute_at } : {}),
+            ...(t.cron ? { cron: t.cron } : {}),
           })),
           null,
           2,
@@ -319,14 +320,19 @@ function buildScheduleTools(scheduleService: ScheduleService) {
     }),
     create_scheduled_task: tool({
       description:
-        "Create a new scheduled task. The task will run at execute_at (ISO date-time string, e.g. 2025-02-05T14:00:00Z). intent is a short description of what to do. context is an optional object with extra details. Use this to schedule follow-ups or deferred work for yourself.",
+        "Create a scheduled task. One-shot: provide execute_at (ISO date-time, e.g. 2025-02-05T14:00:00Z) and the task runs once at that time. Recurring: provide cron (e.g. '*/5 * * * *' for every 5 minutes) and the task repeats. intent is required; context is optional. Use for follow-ups or deferred/recurring work.",
       inputSchema: jsonSchema({
         type: "object",
         properties: {
           execute_at: {
             type: "string",
             description:
-              "When to run the task (ISO 8601 date-time, e.g. 2025-02-05T14:00:00Z)",
+              "When to run the task once (ISO 8601 date-time). Omit if using cron for recurring.",
+          },
+          cron: {
+            type: "string",
+            description:
+              "Cron expression for recurring (e.g. '*/5 * * * *' every 5 min). If set, task repeats; otherwise runs once at execute_at.",
           },
           intent: {
             type: "string",
@@ -338,20 +344,25 @@ function buildScheduleTools(scheduleService: ScheduleService) {
               "Optional extra context (key-value object) for the task",
           },
         },
-        required: ["execute_at", "intent"],
+        required: ["intent"],
         additionalProperties: false,
       }),
       execute: async (input: unknown) => {
         const raw = input as {
           execute_at?: string;
+          cron?: string;
           intent?: string;
           context?: Record<string, unknown>;
         };
         const execute_at =
           typeof raw?.execute_at === "string" ? raw.execute_at.trim() : "";
+        const cronStr = typeof raw?.cron === "string" ? raw.cron.trim() : "";
         const intent = typeof raw?.intent === "string" ? raw.intent.trim() : "";
-        if (!execute_at || !intent) {
-          return "Error: execute_at and intent are required.";
+        if (!intent) {
+          return "Error: intent is required.";
+        }
+        if (!execute_at && !cronStr) {
+          return "Error: provide either execute_at (one-shot) or cron (recurring).";
         }
         const context =
           raw?.context &&
@@ -360,11 +371,15 @@ function buildScheduleTools(scheduleService: ScheduleService) {
             ? (raw.context as Record<string, unknown>)
             : {};
         const id = await scheduleService.schedule({
-          execute_at,
           intent,
           context,
+          ...(execute_at ? { execute_at } : {}),
+          ...(cronStr ? { cron: cronStr } : {}),
         });
         await setReloadFlag(env.REDIS_URL, "schedule");
+        if (cronStr) {
+          return `Scheduled recurring task with id: ${id}. Cron: ${cronStr}.`;
+        }
         return `Scheduled task created with id: ${id}. It will run at ${execute_at}.`;
       },
     }),

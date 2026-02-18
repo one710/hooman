@@ -1,10 +1,21 @@
 import type { Express, Request, Response } from "express";
+import schedule from "node-schedule";
 import type { AppContext } from "./helpers.js";
 import { getParam } from "./helpers.js";
 import { getKillSwitchEnabled } from "../agents/kill-switch.js";
 import { getConfig } from "../config.js";
 import { setReloadFlag } from "../data/reload-flag.js";
 import { env } from "../env.js";
+
+function validateCron(cron: string): boolean {
+  try {
+    const job = schedule.scheduleJob("_validate", cron.trim(), () => {});
+    if (job) job.cancel();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function registerScheduleRoutes(app: Express, ctx: AppContext): void {
   const { scheduler } = ctx;
@@ -23,18 +34,45 @@ export function registerScheduleRoutes(app: Express, ctx: AppContext): void {
         });
         return;
       }
-      const { execute_at, intent, context } = req.body ?? {};
-      if (!execute_at || !intent) {
-        res.status(400).json({ error: "Missing execute_at or intent." });
+      const { execute_at, intent, context, cron } = req.body ?? {};
+      const cronStr =
+        typeof cron === "string" && cron.trim() !== ""
+          ? cron.trim()
+          : undefined;
+      const executeAtStr =
+        typeof execute_at === "string" && execute_at.trim() !== ""
+          ? execute_at.trim()
+          : undefined;
+
+      if (!intent || typeof intent !== "string") {
+        res.status(400).json({ error: "Missing intent." });
         return;
       }
+      if (!executeAtStr && !cronStr) {
+        res.status(400).json({
+          error: "Provide either execute_at (one-shot) or cron (recurring).",
+        });
+        return;
+      }
+      if (cronStr && !validateCron(cronStr)) {
+        res.status(400).json({ error: "Invalid cron expression." });
+        return;
+      }
+
       const id = await scheduler.schedule({
-        execute_at,
-        intent,
+        intent: typeof intent === "string" ? intent : String(intent),
         context: typeof context === "object" ? context : {},
+        ...(executeAtStr ? { execute_at: executeAtStr } : {}),
+        ...(cronStr ? { cron: cronStr } : {}),
       });
       await setReloadFlag(env.REDIS_URL, "schedule");
-      res.status(201).json({ id, execute_at, intent, context: context ?? {} });
+      res.status(201).json({
+        id,
+        intent: typeof intent === "string" ? intent : String(intent),
+        context: context ?? {},
+        ...(executeAtStr ? { execute_at: executeAtStr } : {}),
+        ...(cronStr ? { cron: cronStr } : {}),
+      });
     },
   );
 

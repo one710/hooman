@@ -34,21 +34,43 @@ function runCronScheduler(
   const jobs = new Map<string, Job>();
 
   async function runTask(t: ScheduledTask): Promise<void> {
-    await store.remove(t.id);
+    if (!t.cron) {
+      await store.remove(t.id);
+    }
     await dispatch({
       source: "scheduler",
       type: "task.scheduled",
       payload: {
-        execute_at: t.execute_at,
         intent: t.intent,
         context: t.context,
+        ...(t.execute_at ? { execute_at: t.execute_at } : {}),
+        ...(t.cron ? { cron: t.cron } : {}),
       },
     });
   }
 
   function scheduleOne(t: ScheduledTask): void {
-    const at = new Date(t.execute_at);
-    if (at.getTime() <= Date.now()) {
+    const isRecurring = typeof t.cron === "string" && t.cron.trim() !== "";
+
+    if (isRecurring) {
+      try {
+        const job = schedule.scheduleJob(t.id, t.cron!.trim(), () => {
+          void runTask(t);
+        });
+        if (job) jobs.set(t.id, job);
+      } catch (err) {
+        debug("Invalid cron for task %s: %s", t.id, (err as Error).message);
+      }
+      return;
+    }
+
+    const executeAt = t.execute_at;
+    if (!executeAt) {
+      debug("Skipping task %s: one-shot with no execute_at", t.id);
+      return;
+    }
+    const at = new Date(executeAt);
+    if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) {
       void runTask(t);
       return;
     }
@@ -61,11 +83,15 @@ function runCronScheduler(
 
   async function load(): Promise<void> {
     const tasks = await store.getAll();
-    tasks.sort(
-      (a, b) =>
-        new Date(a.execute_at).getTime() - new Date(b.execute_at).getTime(),
+    const oneShot = tasks.filter(
+      (t) => (!t.cron || t.cron.trim() === "") && t.execute_at,
     );
-    for (const t of tasks) scheduleOne(t);
+    const recurring = tasks.filter((t) => t.cron && t.cron.trim() !== "");
+    oneShot.sort(
+      (a, b) =>
+        new Date(a.execute_at!).getTime() - new Date(b.execute_at!).getTime(),
+    );
+    for (const t of [...oneShot, ...recurring]) scheduleOne(t);
     debug("Cron loaded %d scheduled task(s)", tasks.length);
   }
 

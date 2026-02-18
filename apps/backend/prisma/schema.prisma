@@ -30,10 +30,11 @@ model ChatAttachment {
 }
 
 model Schedule {
-  id         String @id
-  execute_at String
+  id         String  @id
+  execute_at String?
   intent     String
-  context    String @default("{}")
+  context    String  @default("{}")
+  cron       String?
 }
 
 model MCPConnection {

@@ -314,7 +314,8 @@ export async function saveConfig(
 export async function getSchedule(): Promise<{
   tasks: {
     id: string;
-    execute_at: string;
+    execute_at?: string;
+    cron?: string;
     intent: string;
     context: Record<string, unknown>;
   }[];
@@ -325,14 +326,23 @@ export async function getSchedule(): Promise<{
 }
 
 export async function createScheduledTask(
-  execute_at: string,
   intent: string,
   context: Record<string, unknown>,
+  options: { execute_at?: string; cron?: string },
 ): Promise<{ id: string }> {
+  const { execute_at, cron } = options;
+  if (!execute_at && !cron) {
+    throw new Error("Provide either execute_at or cron.");
+  }
   const res = await authFetch(`${BASE}/api/schedule`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ execute_at, intent, context }),
+    body: JSON.stringify({
+      intent,
+      context,
+      ...(execute_at ? { execute_at } : {}),
+      ...(cron ? { cron } : {}),
+    }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

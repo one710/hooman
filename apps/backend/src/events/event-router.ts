@@ -82,13 +82,25 @@ function normalizePayload(
   }
   if (type === "task.scheduled") {
     const execute_at =
-      typeof payload.execute_at === "string" ? payload.execute_at : "";
+      typeof payload.execute_at === "string" && payload.execute_at.trim() !== ""
+        ? payload.execute_at.trim()
+        : undefined;
     const intent = typeof payload.intent === "string" ? payload.intent : "";
     const context =
       payload.context && typeof payload.context === "object"
         ? (payload.context as Record<string, unknown>)
         : {};
-    return { kind: "scheduled_task", execute_at, intent, context };
+    const cron =
+      typeof payload.cron === "string" && payload.cron.trim() !== ""
+        ? payload.cron.trim()
+        : undefined;
+    return {
+      kind: "scheduled_task",
+      intent,
+      context,
+      ...(execute_at !== undefined ? { execute_at } : {}),
+      ...(cron ? { cron } : {}),
+    };
   }
   if (type === "chat.turn_completed") {
     return { kind: "internal", data: payload };

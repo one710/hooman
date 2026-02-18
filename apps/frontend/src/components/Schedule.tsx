@@ -9,7 +9,8 @@ import { Modal } from "./Modal";
 
 interface Task {
   id: string;
-  execute_at: string;
+  execute_at?: string;
+  cron?: string;
   intent: string;
   context: Record<string, unknown>;
 }
@@ -46,13 +47,17 @@ export function Schedule() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!executeAt || !intent) {
-      setError("Set execute time and intent.");
+    if (!intent) {
+      setError("Intent is required.");
+      return;
+    }
+    if (!executeAt) {
+      setError("Set date and time (one-shot task).");
       return;
     }
     setError(null);
     try {
-      await createScheduledTask(executeAt, intent, {});
+      await createScheduledTask(intent, {}, { execute_at: executeAt });
       setExecuteAt("");
       setIntent("");
       setAddOpen(false);
@@ -159,7 +164,11 @@ export function Schedule() {
                   <div>
                     <p className="text-sm text-white">{t.intent}</p>
                     <p className="text-xs text-hooman-muted">
-                      {new Date(t.execute_at).toLocaleString()}
+                      {t.cron
+                        ? `Recurring: ${t.cron}`
+                        : t.execute_at
+                          ? new Date(t.execute_at).toLocaleString()
+                          : "—"}
                     </p>
                   </div>
                   <Button

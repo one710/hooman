@@ -143,9 +143,10 @@ export interface NormalizedMessagePayload {
 
 export interface NormalizedScheduledTaskPayload {
   kind: "scheduled_task";
-  execute_at: string;
+  execute_at?: string;
   intent: string;
   context: Record<string, unknown>;
+  cron?: string;
 }
 
 export interface NormalizedIntegrationEventPayload {
