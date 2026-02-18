@@ -58,29 +58,6 @@ function getSlackMcpEnv(): Record<string, string> | undefined {
   return env;
 }
 
-function getEmailMcpEnv(): Record<string, string> | undefined {
-  const email = getChannelsConfig().email;
-  if (
-    !email?.enabled ||
-    !email.imap?.host?.trim() ||
-    !email.imap?.user?.trim() ||
-    !email.smtp?.host?.trim()
-  )
-    return undefined;
-  return {
-    MCP_EMAIL_SERVER_ACCOUNT_NAME: "default",
-    MCP_EMAIL_SERVER_EMAIL_ADDRESS: email.imap.user,
-    MCP_EMAIL_SERVER_USER_NAME: email.imap.user,
-    MCP_EMAIL_SERVER_PASSWORD: email.imap.password ?? "",
-    MCP_EMAIL_SERVER_IMAP_HOST: email.imap.host,
-    MCP_EMAIL_SERVER_IMAP_PORT: String(email.imap.port ?? 993),
-    MCP_EMAIL_SERVER_IMAP_SSL: email.imap.tls !== false ? "true" : "false",
-    MCP_EMAIL_SERVER_SMTP_HOST: email.smtp.host,
-    MCP_EMAIL_SERVER_SMTP_PORT: String(email.smtp.port ?? 465),
-    MCP_EMAIL_SERVER_SMTP_SSL: email.smtp.tls !== false ? "true" : "false",
-  };
-}
-
 function getDefaultMcpConnections(): MCPConnectionStdio[] {
   return [
     {
@@ -134,17 +111,6 @@ function getChannelDefaultMcpConnections(): MCPConnectionStdio[] {
       command: "npx",
       args: ["tsx", WHATSAPP_MCP_SERVER_PATH],
       env: { REDIS_URL: env.REDIS_URL },
-    });
-  }
-  const emailMcpEnv = getEmailMcpEnv();
-  if (emailMcpEnv) {
-    out.push({
-      id: "_default_email",
-      type: "stdio",
-      name: "email",
-      command: "uvx",
-      args: ["mcp-email-server@latest", "stdio"],
-      env: emailMcpEnv,
     });
   }
   return out;

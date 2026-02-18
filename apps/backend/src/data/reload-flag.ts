@@ -1,11 +1,11 @@
 /**
  * Redis-backed reload flags per scope so the API can signal only the affected workers.
- * Scopes: schedule (cron tasks), slack, whatsapp, email (cron email poll).
+ * Scopes: schedule (cron tasks), slack, whatsapp.
  * Uses shared client from data/redis; call initRedis(redisUrl) first.
  */
 import { initRedis, getRedis } from "./redis.js";
 
-export type ReloadScope = "schedule" | "slack" | "whatsapp" | "email";
+export type ReloadScope = "schedule" | "slack" | "whatsapp";
 
 const REDIS_KEY_PREFIX = "hooman:workers:reload:";
 const POLL_MS = 2000;

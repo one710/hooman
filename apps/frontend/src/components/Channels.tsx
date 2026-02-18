@@ -84,7 +84,6 @@ import { Button } from "./Button";
 import { useDialog } from "./Dialog";
 import { Modal } from "./Modal";
 import { SlackConfigForm } from "./SlackConfigForm";
-import { EmailConfigForm } from "./EmailConfigForm";
 import { WhatsAppConfigForm } from "./WhatsAppConfigForm";
 
 export function Channels() {
@@ -131,7 +130,6 @@ export function Channels() {
     try {
       const patch: Record<string, unknown> = {};
       if (id === "slack") patch.slack = { ...current.config, enabled: next };
-      if (id === "email") patch.email = { ...current.config, enabled: next };
       if (id === "whatsapp")
         patch.whatsapp = { ...current.config, enabled: next };
       await patchChannels(patch);
@@ -148,7 +146,6 @@ export function Channels() {
     try {
       const patch: Record<string, unknown> = {};
       if (id === "slack") patch.slack = config;
-      if (id === "email") patch.email = config;
       if (id === "whatsapp") patch.whatsapp = config;
       await patchChannels(patch);
       setConfigModalChannel(null);
@@ -168,7 +165,7 @@ export function Channels() {
     );
   }
 
-  const order = ["web", "slack", "email", "whatsapp"];
+  const order = ["web", "slack", "whatsapp"];
   const list = order
     .map((id) => channels?.[id])
     .filter(Boolean) as ChannelEntry[];
@@ -180,7 +177,7 @@ export function Channels() {
           Channels
         </h2>
         <p className="text-xs md:text-sm text-hooman-muted">
-          Manage where Hooman receives messages (web, Slack, email, WhatsApp).
+          Manage where Hooman receives messages (web, Slack, WhatsApp).
         </p>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
@@ -389,14 +386,6 @@ function ConfigModal({
       )}
       {channel.id === "slack" && (
         <SlackConfigForm
-          id={formId}
-          config={config}
-          onSave={onSave}
-          saving={saving}
-        />
-      )}
-      {channel.id === "email" && (
-        <EmailConfigForm
           id={formId}
           config={config}
           onSave={onSave}

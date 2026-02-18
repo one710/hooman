@@ -6,7 +6,6 @@ export type EventSource =
   | "scheduler"
   | "internal"
   | "slack"
-  | "email"
   | "whatsapp";
 
 export interface BaseEvent {
@@ -55,28 +54,6 @@ export interface SlackChannelConfig {
   filterList?: string[];
 }
 
-export interface EmailChannelConfig {
-  enabled: boolean;
-  imap: {
-    host: string;
-    port: number;
-    user: string;
-    password: string;
-    tls?: boolean;
-  };
-  /** Optional SMTP for sending (host, port, tls). Username/password same as IMAP; collect only host/port/tls in channel config. */
-  smtp?: {
-    host: string;
-    port: number;
-    tls?: boolean;
-  };
-  pollIntervalMs: number;
-  folders?: string[];
-  identityAddresses?: string[];
-  filterMode?: FilterMode;
-  filterList?: string[];
-}
-
 export interface WhatsAppChannelConfig {
   enabled: boolean;
   /** Folder name only; session is stored under workspace/whatsapp/<sessionPath>. Defaults to "default". */
@@ -87,7 +64,6 @@ export interface WhatsAppChannelConfig {
 
 export interface ChannelsConfig {
   slack?: SlackChannelConfig;
-  email?: EmailChannelConfig;
   whatsapp?: WhatsAppChannelConfig;
 }
 
@@ -135,22 +111,6 @@ export interface SlackChannelMeta extends ChannelMetaBase {
   selfMentioned?: boolean;
 }
 
-/** Email channel metadata. */
-export interface EmailChannelMeta extends ChannelMetaBase {
-  channel: "email";
-  messageId: string;
-  to: string;
-  from: string;
-  fromName?: string;
-  inReplyTo?: string;
-  references?: string;
-  destinationType: "inbox";
-  toAddresses: string[];
-  ccAddresses: string[];
-  bccAddresses: string[];
-  selfInRecipients: boolean;
-}
-
 /** WhatsApp channel metadata. */
 export interface WhatsAppChannelMeta extends ChannelMetaBase {
   channel: "whatsapp";
@@ -163,10 +123,7 @@ export interface WhatsAppChannelMeta extends ChannelMetaBase {
 }
 
 /** Union of all channel-specific metadata. Delivered in run context to the agent. */
-export type ChannelMeta =
-  | SlackChannelMeta
-  | EmailChannelMeta
-  | WhatsAppChannelMeta;
+export type ChannelMeta = SlackChannelMeta | WhatsAppChannelMeta;
 
 export interface NormalizedMessagePayload {
   kind: "message";
@@ -175,7 +132,7 @@ export interface NormalizedMessagePayload {
   attachments?: ChatAttachment[];
   /** IDs of uploaded files (for persisting with chat history). */
   attachment_ids?: string[];
-  /** Present for slack/email/whatsapp; who, where, message ID, directness. Passed in run context to the agent. */
+  /** Present for slack/whatsapp; who, where, message ID, directness. Passed in run context to the agent. */
   channelMeta?: ChannelMeta;
   /** Set when the message text was transcribed from an audio/voice message. */
   sourceMessageType?: "audio";
