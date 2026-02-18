@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Menu } from "lucide-react";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { Chat } from "./components/Chat";
 import { Channels } from "./components/Channels";
 import { Sidebar } from "./components/Sidebar";
@@ -24,9 +25,56 @@ const VIEW_LABELS: Record<View, string> = {
   settings: "Settings",
 };
 
-export default function App() {
-  const [view, setView] = useState<View>("chat");
+const PATH_TO_VIEW: Record<string, View> = {
+  "/": "chat",
+  "/chat": "chat",
+  "/channels": "channels",
+  "/schedule": "schedule",
+  "/audit": "audit",
+  "/safety": "safety",
+  "/capabilities": "capabilities",
+  "/settings": "settings",
+};
+
+function pathnameToView(pathname: string): View {
+  return PATH_TO_VIEW[pathname] ?? "chat";
+}
+
+function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const view = pathnameToView(location.pathname);
+
+  return (
+    <div className="flex h-screen bg-hooman-bg text-zinc-200 overflow-hidden">
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
+      )}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
+        <div className="md:hidden shrink-0 flex items-center gap-3 px-4 py-3 border-b border-hooman-border bg-hooman-surface">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-2 rounded-lg text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="font-medium text-white">{VIEW_LABELS[view]}</span>
+        </div>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatTotal, setChatTotal] = useState(0);
   const [chatPage, setChatPage] = useState(1);
@@ -61,58 +109,31 @@ export default function App() {
     }
   }, []);
 
-  const setViewAndCloseSidebar = useCallback((v: View) => {
-    setView(v);
-    setSidebarOpen(false);
-  }, []);
-
   return (
-    <div className="flex h-screen bg-hooman-bg text-zinc-200 overflow-hidden">
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close menu"
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+    <Routes>
+      <Route element={<Layout />}>
+        <Route
+          index
+          element={
+            <Chat
+              messages={chatMessages}
+              setMessages={setChatMessages}
+              hasMoreOlder={chatTotal > chatMessages.length}
+              onLoadOlder={loadOlderChat}
+              loadingOlder={loadingOlder}
+              onClearChat={handleClearChat}
+            />
+          }
         />
-      )}
-      <Sidebar
-        view={view}
-        setView={setViewAndCloseSidebar}
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-      <main className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Mobile top bar: menu + view title */}
-        <div className="md:hidden shrink-0 flex items-center gap-3 px-4 py-3 border-b border-hooman-border bg-hooman-surface">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <span className="font-medium text-white">{VIEW_LABELS[view]}</span>
-        </div>
-        {view === "channels" && <Channels />}
-        {view === "chat" && (
-          <Chat
-            messages={chatMessages}
-            setMessages={setChatMessages}
-            hasMoreOlder={chatTotal > chatMessages.length}
-            onLoadOlder={loadOlderChat}
-            loadingOlder={loadingOlder}
-            onClearChat={handleClearChat}
-          />
-        )}
-        {view === "schedule" && <Schedule />}
-        {view === "audit" && <Audit />}
-        {view === "safety" && <Safety />}
-        {view === "capabilities" && <Capabilities />}
-        {view === "settings" && <Settings />}
-      </main>
-    </div>
+        <Route path="chat" element={<Navigate to="/" replace />} />
+        <Route path="channels" element={<Channels />} />
+        <Route path="schedule" element={<Schedule />} />
+        <Route path="audit" element={<Audit />} />
+        <Route path="safety" element={<Safety />} />
+        <Route path="capabilities" element={<Capabilities />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }

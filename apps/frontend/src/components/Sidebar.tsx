@@ -1,3 +1,4 @@
+import { NavLink } from "react-router-dom";
 import {
   MessageCircle,
   Radio,
@@ -12,23 +13,26 @@ import {
 import type { View } from "../types";
 
 interface SidebarProps {
-  view: View;
-  setView: (v: View) => void;
   open?: boolean;
   onClose?: () => void;
 }
 
-const nav: { id: View; label: string; Icon: LucideIcon }[] = [
-  { id: "chat", label: "Chat", Icon: MessageCircle },
-  { id: "channels", label: "Channels", Icon: Radio },
-  { id: "schedule", label: "Schedule", Icon: Clock },
-  { id: "audit", label: "Audit log", Icon: ClipboardList },
-  { id: "safety", label: "Safety", Icon: Shield },
-  { id: "capabilities", label: "Capabilities", Icon: Plug },
-  { id: "settings", label: "Settings", Icon: Settings },
+const nav: { id: View; label: string; path: string; Icon: LucideIcon }[] = [
+  { id: "chat", label: "Chat", path: "/", Icon: MessageCircle },
+  { id: "channels", label: "Channels", path: "/channels", Icon: Radio },
+  { id: "schedule", label: "Schedule", path: "/schedule", Icon: Clock },
+  { id: "audit", label: "Audit log", path: "/audit", Icon: ClipboardList },
+  { id: "safety", label: "Safety", path: "/safety", Icon: Shield },
+  {
+    id: "capabilities",
+    label: "Capabilities",
+    path: "/capabilities",
+    Icon: Plug,
+  },
+  { id: "settings", label: "Settings", path: "/settings", Icon: Settings },
 ];
 
-export function Sidebar({ view, setView, open = true, onClose }: SidebarProps) {
+export function Sidebar({ open = true, onClose }: SidebarProps) {
   return (
     <aside
       className={`
@@ -60,18 +64,22 @@ export function Sidebar({ view, setView, open = true, onClose }: SidebarProps) {
         {nav.map((item) => {
           const Icon = item.Icon;
           return (
-            <button
+            <NavLink
               key={item.id}
-              onClick={() => setView(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
-                view === item.id
-                  ? "bg-hooman-accent/20 text-hooman-accent"
-                  : "text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
-              }`}
+              to={item.path}
+              end={item.path === "/"}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
+                  isActive
+                    ? "bg-hooman-accent/20 text-hooman-accent"
+                    : "text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
+                }`
+              }
             >
               <Icon className="w-4 h-4 shrink-0" aria-hidden />
               {item.label}
-            </button>
+            </NavLink>
           );
         })}
       </nav>
