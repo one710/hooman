@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   MessageCircle,
   Radio,
@@ -7,9 +7,12 @@ import {
   Shield,
   Plug,
   Settings,
+  LogOut,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { clearToken } from "../auth";
+import { resetSocket } from "../socket";
 import type { View } from "../types";
 
 interface SidebarProps {
@@ -33,6 +36,12 @@ const nav: { id: View; label: string; path: string; Icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({ open = true, onClose }: SidebarProps) {
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    clearToken();
+    resetSocket();
+    navigate("/login", { replace: true });
+  };
   return (
     <aside
       className={`
@@ -82,6 +91,16 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
             </NavLink>
           );
         })}
+        <div className="mt-2 pt-2 border-t border-hooman-border">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200 transition-colors"
+          >
+            <LogOut className="w-4 h-4 shrink-0" aria-hidden />
+            Log out
+          </button>
+        </div>
       </nav>
     </aside>
   );

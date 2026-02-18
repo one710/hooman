@@ -152,18 +152,38 @@ Access at http://localhost:3000 and the UI at :5173 is unchanged; only requests 
 
 ---
 
+## Exposing the web app (optional)
+
+By default, the API only allows non-localhost requests to the completions paths; the rest of the web UI and API are restricted to localhost. To run Hooman on a server and use the web UI from another machine (e.g. your laptop), enable **web auth** so that login is required and the API accepts requests from any host.
+
+1. **Set credentials in `.env`.** You need all three:
+   - `WEB_AUTH_USERNAME` — login username (plain text).
+   - `WEB_AUTH_PASSWORD_HASH` — argon2id hash of your password. Run `yarn hash-password` (or `yarn hash-password --password=yourpassword`) and paste the printed line into `.env`.
+   - `JWT_SECRET` — a strong secret to sign JWTs (e.g. 32+ random bytes).
+
+2. **Restart the API.** With these set, the API no longer applies localhost-only restriction; all protected routes and Socket.IO require a valid JWT. The web UI will show a login page; after sign-in, the JWT is sent with every API request and Socket.IO connection.
+
+3. **Deploy.** Run the API and frontend on your server (or serve the built frontend from the API). Point your browser at the frontend URL; sign in with the username and password you configured. Use HTTPS in production.
+
+Without these env vars, behavior is unchanged: only localhost can access the web UI and API (except completions when using ngrok).
+
+---
+
 ## Environment
 
 When running locally, create a `.env` from `.env.example`. Key variables:
 
-| Variable                | Required | Description                                                                                                     |
-| ----------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`          | No       | Prisma SQLite URL (default: `workspace/hooman.db` at project root).                                             |
-| `PORT`                  | No       | API port (default 3000).                                                                                        |
-| `REDIS_URL`             | Yes\*    | Redis for event queue and kill switch (e.g. `redis://localhost:6379`). Start with `docker compose up -d redis`. |
-| `VITE_API_BASE`         | No       | Set when building for production so the web app can call the API (e.g. `http://localhost:3000`).                |
-| `MCP_STDIO_DEFAULT_CWD` | No       | Working directory for stdio MCP / filesystem server (default: `workspace/mcpcwd`).                              |
-| `SKILLS_CWD`            | No       | Override project root for skills (default: repo root). Skills are in `<project>/.agents/skills`.                |
+| Variable                 | Required | Description                                                                                                     |
+| ------------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | No       | Prisma SQLite URL (default: `workspace/hooman.db` at project root).                                             |
+| `PORT`                   | No       | API port (default 3000).                                                                                        |
+| `REDIS_URL`              | Yes\*    | Redis for event queue and kill switch (e.g. `redis://localhost:6379`). Start with `docker compose up -d redis`. |
+| `VITE_API_BASE`          | No       | Set when building for production so the web app can call the API (e.g. `http://localhost:3000`).                |
+| `MCP_STDIO_DEFAULT_CWD`  | No       | Working directory for stdio MCP / filesystem server (default: `workspace/mcpcwd`).                              |
+| `SKILLS_CWD`             | No       | Override project root for skills (default: repo root). Skills are in `<project>/.agents/skills`.                |
+| `WEB_AUTH_USERNAME`      | No       | When set with `WEB_AUTH_PASSWORD_HASH` and `JWT_SECRET`, enables login; API is reachable from any host.         |
+| `WEB_AUTH_PASSWORD_HASH` | No       | Argon2id hash of password. Generate with `yarn hash-password` and add the printed line to `.env`.               |
+| `JWT_SECRET`             | No       | Secret to sign JWTs when web auth is enabled. Use a strong value (e.g. 32+ random bytes).                       |
 
 All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), `memory.db` (mem0 history), `vector.db` (mem0 vectors, created on first chat after you set an API key), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, models, and web search are set in the **Settings** UI (persisted by the API), not via env.
 
@@ -171,17 +191,18 @@ All runtime data is stored under **`workspace/`** at project root: `hooman.db` (
 
 ## Scripts
 
-| Command             | Description                                                                                     |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| `yarn dev`          | Full stack: API, frontend, Slack worker, WhatsApp worker, cron, event-queue (ports 3000, 5173). |
-| `yarn dev:api`      | API only (port 3000).                                                                           |
-| `yarn dev:frontend` | Web UI only (port 5173).                                                                        |
-| `yarn dev:slack`    | Slack worker only.                                                                              |
-| `yarn dev:whatsapp` | WhatsApp worker only.                                                                           |
-| `yarn build`        | Build API and web app.                                                                          |
-| `yarn start`        | Start API and web with PM2 (production).                                                        |
-| `yarn stop`         | Stop PM2 processes.                                                                             |
-| `yarn restart`      | Restart PM2 processes.                                                                          |
+| Command              | Description                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| `yarn dev`           | Full stack: API, frontend, Slack worker, WhatsApp worker, cron, event-queue (ports 3000, 5173). |
+| `yarn dev:api`       | API only (port 3000).                                                                           |
+| `yarn dev:frontend`  | Web UI only (port 5173).                                                                        |
+| `yarn dev:slack`     | Slack worker only.                                                                              |
+| `yarn dev:whatsapp`  | WhatsApp worker only.                                                                           |
+| `yarn build`         | Build API and web app.                                                                          |
+| `yarn start`         | Start API and web with PM2 (production).                                                        |
+| `yarn stop`          | Stop PM2 processes.                                                                             |
+| `yarn restart`       | Restart PM2 processes.                                                                          |
+| `yarn hash-password` | Generate argon2id hash for `WEB_AUTH_PASSWORD_HASH`. Optionally pass `--password=yourpassword`. |
 
 After code or config changes in production, run `yarn build` then `yarn restart`.
 
