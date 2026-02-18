@@ -1,5 +1,5 @@
 /**
- * HTTP client for workers to post events to the API. Used by apps/workers (Slack, Email, etc.)
+ * HTTP client for workers to post events to the API. Used by apps/workers (Slack, WhatsApp, etc.)
  * when running as separate processes. The API exposes POST /api/internal/dispatch.
  */
 import type { RawDispatchInput } from "./types.js";

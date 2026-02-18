@@ -32,12 +32,6 @@ function buildChannelContext(
     lines.push(`destinationType: ${meta.destinationType}`);
     lines.push(`senderId: ${meta.senderId}`);
     if (meta.senderName) lines.push(`senderName: ${meta.senderName}`);
-  } else if (meta.channel === "email") {
-    lines.push(`messageId: ${meta.messageId}`);
-    lines.push(`from: ${meta.from}`);
-    if (meta.fromName) lines.push(`fromName: ${meta.fromName}`);
-    lines.push(`to: ${meta.to}`);
-    if (meta.inReplyTo) lines.push(`inReplyTo: ${meta.inReplyTo}`);
   }
   lines.push(`directness: ${meta.directness}`);
   if (meta.directnessReason)

@@ -15,12 +15,12 @@ Be conversational and human-first. Use memory context when provided to tailor an
 /**
  * Static instructions always appended to the agent (not user-configurable).
  * Covers channel replies, time tool usage, and tool-result honesty. Channel-specific
- * rules (e.g. WhatsApp chat ID, Slack/WhatsApp/Email formatting) are appended only when enabled.
+ * rules (e.g. WhatsApp chat ID, Slack/WhatsApp formatting) are appended only when enabled.
  */
 export const STATIC_AGENT_INSTRUCTIONS_APPEND = `
 ## Channel replies (IMPORTANT)
 
-You receive messages from different channels (web chat, Slack, WhatsApp, Email).
+You receive messages from different channels (web chat, Slack, WhatsApp).
 When a "[Channel context]" block is present in the conversation, you MUST reply on that channel
 using the available MCP tools. This is mandatory — do not skip it or just respond in text.
 
@@ -30,7 +30,6 @@ Steps when channel context is present:
 3. Call the appropriate MCP tool to send the reply on the source channel:
    - WhatsApp → call whatsapp_send_message with the chatId and your reply text.
    - Slack → call the Slack MCP tool to post a message in the channelId. Using threadTs to reply in-thread is optional — use your judgment (e.g. DMs often feel more natural without threading).
-   - Email → call the email MCP tool to reply to the message.
 4. Your final text output should be the same reply you sent via the tool.
 
 ## Current time and time-critical operations
@@ -66,12 +65,6 @@ Strip all non-digits from the number, then append @c.us. Use that as chatId in w
 ## Formatting replies for WhatsApp
 
 When sending via WhatsApp, use WhatsApp formatting (or plain text): *bold*, _italic_, ~strikethrough~, \`\`\`monospace\`\`\` (triple backticks).`);
-  }
-  if (channels.email?.enabled) {
-    parts.push(`
-## Formatting replies for Email
-
-When replying by email, prefer HTML or plain text for the reply body. Do not use Markdown in the body sent to the email tool; convert to HTML or plain text as appropriate.`);
   }
   return parts.join("");
 }
@@ -290,7 +283,6 @@ export function updateChannelsConfig(
   patch: Partial<ChannelsConfig>,
 ): ChannelsConfig {
   if (patch.slack !== undefined) channelsStore.slack = patch.slack;
-  if (patch.email !== undefined) channelsStore.email = patch.email;
   if (patch.whatsapp !== undefined) channelsStore.whatsapp = patch.whatsapp;
   persist().catch((err) => debug("persist error: %o", err));
   return getChannelsConfig();

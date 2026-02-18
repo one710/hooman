@@ -1,4 +1,4 @@
-/** PM2 ecosystem: backend (API), frontend, and workers (slack, whatsapp, cron, event-queue). Email runs as a cron job. Run `yarn build` first. CWD is project root. */
+/** PM2 ecosystem: backend (API), frontend, and workers (slack, whatsapp, cron, event-queue). Cron runs scheduled tasks only. Run `yarn build` first. CWD is project root. */
 module.exports = {
   apps: [
     {

@@ -176,7 +176,6 @@ export async function getChannels(): Promise<{
 /** Patch channel config (partial merge; masked secrets are not overwritten). */
 export async function patchChannels(patch: {
   slack?: Record<string, unknown>;
-  email?: Record<string, unknown>;
   whatsapp?: Record<string, unknown>;
 }): Promise<{ channels: Record<string, unknown> }> {
   const res = await fetch(`${BASE}/api/channels`, {

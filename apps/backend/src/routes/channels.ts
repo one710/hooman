@@ -44,36 +44,6 @@ export function registerChannelRoutes(app: Express, _ctx: AppContext): void {
               enabled: false,
               config: null,
             },
-        email: channels.email
-          ? {
-              id: "email",
-              name: "Email",
-              alwaysOn: false,
-              enabled: channels.email.enabled,
-              config: {
-                ...channels.email,
-                imap: channels.email.imap
-                  ? {
-                      ...channels.email.imap,
-                      password: mask(channels.email.imap.password),
-                    }
-                  : undefined,
-                smtp: channels.email.smtp
-                  ? {
-                      host: channels.email.smtp.host,
-                      port: channels.email.smtp.port,
-                      tls: channels.email.smtp.tls,
-                    }
-                  : undefined,
-              },
-            }
-          : {
-              id: "email",
-              name: "Email",
-              alwaysOn: false,
-              enabled: false,
-              config: null,
-            },
         whatsapp: channels.whatsapp
           ? {
               id: "whatsapp",
@@ -117,34 +87,6 @@ export function registerChannelRoutes(app: Express, _ctx: AppContext): void {
             : b?.userToken,
         } as ChannelsConfig["slack"];
       }
-      if (body.email !== undefined) {
-        const b = body.email as ChannelsConfig["email"];
-        const c = current.email;
-        const imapMerge =
-          b?.imap && c?.imap
-            ? {
-                ...c.imap,
-                ...b.imap,
-                password: isMasked(b.imap.password)
-                  ? c.imap.password
-                  : b.imap.password,
-              }
-            : (b?.imap ?? c?.imap);
-        const smtpNorm =
-          b?.smtp && typeof b.smtp === "object" && b.smtp.host
-            ? {
-                host: String(b.smtp.host).trim(),
-                port: Number(b.smtp.port) || 465,
-                tls: b.smtp.tls !== false,
-              }
-            : undefined;
-        patch.email = {
-          ...c,
-          ...b,
-          imap: imapMerge,
-          smtp: smtpNorm,
-        } as ChannelsConfig["email"];
-      }
       if (body.whatsapp !== undefined)
         patch.whatsapp = {
           ...current.whatsapp,
@@ -153,7 +95,6 @@ export function registerChannelRoutes(app: Express, _ctx: AppContext): void {
       updateChannelsConfig(patch);
       const channelScopes: ReloadScope[] = [];
       if (body.slack !== undefined) channelScopes.push("slack");
-      if (body.email !== undefined) channelScopes.push("email");
       if (body.whatsapp !== undefined) channelScopes.push("whatsapp");
       if (channelScopes.length)
         await setReloadFlags(env.REDIS_URL, channelScopes);
