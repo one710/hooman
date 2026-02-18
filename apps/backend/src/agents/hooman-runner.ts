@@ -629,7 +629,7 @@ export async function createHoomanRunner(options?: {
       if (runOptions?.channelContext?.trim()) {
         input.push({
           role: "user",
-          content: `[Channel context] This message arrived from an external channel. You MUST use the matching MCP tool to send your reply back on this channel.\n${runOptions.channelContext.trim()}\n\n---`,
+          content: `[Channel context] This message originated from an external channel. Always send your response to this source channel using the matching MCP tool (see source_channel and identifiers below).\n${runOptions.channelContext.trim()}\n\n---`,
         });
       }
       for (const item of thread) {
