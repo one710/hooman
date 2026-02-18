@@ -36,9 +36,23 @@ export const env = {
   SKILLS_CWD: str("SKILLS_CWD", PROJECT_ROOT),
   /** Optional path to Chrome/Chromium for whatsapp-web.js (Puppeteer). If unset, adapter may use a platform default (e.g. macOS Chrome). */
   PUPPETEER_EXECUTABLE_PATH: str("PUPPETEER_EXECUTABLE_PATH", ""),
+  /** Web UI auth: username (plain). When set with WEB_AUTH_PASSWORD_HASH and JWT_SECRET, login is required. */
+  WEB_AUTH_USERNAME: str("WEB_AUTH_USERNAME", ""),
+  /** Web UI auth: argon2id hash of password. Use `yarn hash-password` to generate. */
+  WEB_AUTH_PASSWORD_HASH: str("WEB_AUTH_PASSWORD_HASH", ""),
+  /** Secret to sign JWTs when web auth is enabled. */
+  JWT_SECRET: str("JWT_SECRET", ""),
 } as const;
 
 export { BACKEND_ROOT, PROJECT_ROOT, WORKSPACE_ROOT };
+
+/** True when all web auth env vars are set; then protected routes and Socket.IO require JWT. */
+export function isWebAuthEnabled(): boolean {
+  const u = env.WEB_AUTH_USERNAME.trim();
+  const h = env.WEB_AUTH_PASSWORD_HASH.trim();
+  const s = env.JWT_SECRET.trim();
+  return u !== "" && h !== "" && s !== "";
+}
 
 export function getDatabaseUrl(): string {
   return env.DATABASE_URL || `file:${join(WORKSPACE_ROOT, "hooman.db")}`;

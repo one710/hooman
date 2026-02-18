@@ -1,3 +1,5 @@
+import { clearToken, getToken } from "./auth";
+
 /** API base URL. Set VITE_API_BASE when building, or defaults to http://localhost:3000. */
 const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:3000";
 
@@ -7,6 +9,43 @@ function apiError(res: Response, body: string): string {
     `${res.status} ${res.statusText}`.trim() ||
     "Request failed";
   return msg;
+}
+
+/** Fetch with Authorization header when token exists; on 401 clear token and redirect to login. */
+async function authFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(input, { ...init, headers });
+  if (res.status === 401) {
+    clearToken();
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
+/** Login (no auth header). Returns token on success; throws on failure. */
+export async function login(
+  username: string,
+  password: string,
+): Promise<{ token: string }> {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const body = await res.text();
+  if (!res.ok) throw new Error(apiError(res, body));
+  const data = JSON.parse(body) as { token?: string };
+  if (typeof data?.token !== "string")
+    throw new Error("Invalid login response");
+  return { token: data.token };
 }
 
 export interface ChatAttachmentMeta {
@@ -37,7 +76,7 @@ export async function getChatHistory(params?: {
   if (params?.page != null) sp.set("page", String(params.page));
   if (params?.pageSize != null) sp.set("pageSize", String(params.pageSize));
   const url = `${BASE}/api/chat/history` + (sp.toString() ? `?${sp}` : "");
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (!res.ok)
     return {
       messages: [],
@@ -55,7 +94,7 @@ export async function getChatHistory(params?: {
 }
 
 export async function clearChatHistory(): Promise<{ cleared: boolean }> {
-  const res = await fetch(`${BASE}/api/chat/history`, { method: "DELETE" });
+  const res = await authFetch(`${BASE}/api/chat/history`, { method: "DELETE" });
   if (!res.ok) throw new Error(apiError(res, await res.text()));
   return res.json();
 }
@@ -66,7 +105,7 @@ export async function uploadAttachments(
 ): Promise<{ attachments: ChatAttachmentMeta[] }> {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
-  const res = await fetch(`${BASE}/api/chat/attachments`, {
+  const res = await authFetch(`${BASE}/api/chat/attachments`, {
     method: "POST",
     body: form,
   });
@@ -93,7 +132,7 @@ export function getAttachmentUrl(id: string): string {
 export async function getRealtimeClientSecret(model?: string): Promise<{
   value: string;
 }> {
-  const res = await fetch(`${BASE}/api/realtime/client-secret`, {
+  const res = await authFetch(`${BASE}/api/realtime/client-secret`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(model != null ? { model } : {}),
@@ -108,7 +147,7 @@ export async function sendMessage(
   text: string,
   attachment_ids?: string[],
 ): Promise<{ eventId: string }> {
-  const res = await fetch(`${BASE}/api/chat`, {
+  const res = await authFetch(`${BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(
@@ -124,13 +163,13 @@ export async function sendMessage(
 export async function getAudit(): Promise<{
   entries: import("./types").AuditEntry[];
 }> {
-  const res = await fetch(`${BASE}/api/audit`);
+  const res = await authFetch(`${BASE}/api/audit`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getKillSwitch(): Promise<{ enabled: boolean }> {
-  const res = await fetch(`${BASE}/api/safety/kill-switch`);
+  const res = await authFetch(`${BASE}/api/safety/kill-switch`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -139,7 +178,7 @@ export async function getKillSwitch(): Promise<{ enabled: boolean }> {
 export async function getCapabilitiesAvailable(): Promise<{
   capabilities: { integrationId: string; capability: string }[];
 }> {
-  const res = await fetch(`${BASE}/api/capabilities/available`);
+  const res = await authFetch(`${BASE}/api/capabilities/available`);
   if (!res.ok) return { capabilities: [] };
   return res.json();
 }
@@ -147,7 +186,7 @@ export async function getCapabilitiesAvailable(): Promise<{
 export async function setKillSwitch(
   enabled: boolean,
 ): Promise<{ enabled: boolean }> {
-  const res = await fetch(`${BASE}/api/safety/kill-switch`, {
+  const res = await authFetch(`${BASE}/api/safety/kill-switch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -168,7 +207,7 @@ export interface ChannelEntry {
 export async function getChannels(): Promise<{
   channels: Record<string, ChannelEntry>;
 }> {
-  const res = await fetch(`${BASE}/api/channels`);
+  const res = await authFetch(`${BASE}/api/channels`);
   if (!res.ok) throw new Error(apiError(res, await res.text()));
   return res.json();
 }
@@ -178,7 +217,7 @@ export async function patchChannels(patch: {
   slack?: Record<string, unknown>;
   whatsapp?: Record<string, unknown>;
 }): Promise<{ channels: Record<string, unknown> }> {
-  const res = await fetch(`${BASE}/api/channels`, {
+  const res = await authFetch(`${BASE}/api/channels`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -196,7 +235,7 @@ export async function getWhatsAppConnection(): Promise<{
   /** Display number (e.g. +1234567890). */
   selfNumber?: string;
 }> {
-  const res = await fetch(`${BASE}/api/channels/whatsapp/connection`);
+  const res = await authFetch(`${BASE}/api/channels/whatsapp/connection`);
   if (!res.ok) return { status: "disconnected" };
   return res.json();
 }
@@ -255,7 +294,7 @@ export interface AppConfig {
 }
 
 export async function getConfig(): Promise<AppConfig> {
-  const res = await fetch(`${BASE}/api/config`);
+  const res = await authFetch(`${BASE}/api/config`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -263,7 +302,7 @@ export async function getConfig(): Promise<AppConfig> {
 export async function saveConfig(
   patch: Partial<AppConfig>,
 ): Promise<AppConfig> {
-  const res = await fetch(`${BASE}/api/config`, {
+  const res = await authFetch(`${BASE}/api/config`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -280,7 +319,7 @@ export async function getSchedule(): Promise<{
     context: Record<string, unknown>;
   }[];
 }> {
-  const res = await fetch(`${BASE}/api/schedule`);
+  const res = await authFetch(`${BASE}/api/schedule`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -290,7 +329,7 @@ export async function createScheduledTask(
   intent: string,
   context: Record<string, unknown>,
 ): Promise<{ id: string }> {
-  const res = await fetch(`${BASE}/api/schedule`, {
+  const res = await authFetch(`${BASE}/api/schedule`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ execute_at, intent, context }),
@@ -300,7 +339,9 @@ export async function createScheduledTask(
 }
 
 export async function cancelScheduledTask(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/schedule/${id}`, { method: "DELETE" });
+  const res = await authFetch(`${BASE}/api/schedule/${id}`, {
+    method: "DELETE",
+  });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -308,7 +349,7 @@ export async function cancelScheduledTask(id: string): Promise<void> {
 export async function getMCPConnections(): Promise<{
   connections: import("./types").MCPConnection[];
 }> {
-  const res = await fetch(`${BASE}/api/mcp/connections`);
+  const res = await authFetch(`${BASE}/api/mcp/connections`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -316,7 +357,7 @@ export async function getMCPConnections(): Promise<{
 export async function createMCPConnection(
   connection: import("./types").MCPConnection,
 ): Promise<{ connection: import("./types").MCPConnection }> {
-  const res = await fetch(`${BASE}/api/mcp/connections`, {
+  const res = await authFetch(`${BASE}/api/mcp/connections`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(connection),
@@ -329,7 +370,7 @@ export async function updateMCPConnection(
   id: string,
   patch: Partial<import("./types").MCPConnection>,
 ): Promise<{ connection: import("./types").MCPConnection }> {
-  const res = await fetch(`${BASE}/api/mcp/connections/${id}`, {
+  const res = await authFetch(`${BASE}/api/mcp/connections/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -339,7 +380,7 @@ export async function updateMCPConnection(
 }
 
 export async function deleteMCPConnection(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/mcp/connections/${id}`, {
+  const res = await authFetch(`${BASE}/api/mcp/connections/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -347,7 +388,7 @@ export async function deleteMCPConnection(id: string): Promise<void> {
 
 /** OAuth callback URL for MCP (to prefill redirect_uri). */
 export async function getOAuthCallbackUrl(): Promise<{ callbackUrl: string }> {
-  const res = await fetch(`${BASE}/api/mcp/oauth/callback-url`);
+  const res = await authFetch(`${BASE}/api/mcp/oauth/callback-url`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -356,7 +397,7 @@ export async function getOAuthCallbackUrl(): Promise<{ callbackUrl: string }> {
 export async function startMCPOAuth(
   connectionId: string,
 ): Promise<{ authorizationUrl: string } | { status: "already_authorized" }> {
-  const res = await fetch(`${BASE}/api/mcp/oauth/start`, {
+  const res = await authFetch(`${BASE}/api/mcp/oauth/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ connectionId }),
@@ -384,7 +425,7 @@ export interface SkillsListApiResponse {
 }
 
 export async function getSkillsList(): Promise<SkillsListApiResponse> {
-  const res = await fetch(`${BASE}/api/skills/list`);
+  const res = await authFetch(`${BASE}/api/skills/list`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -392,7 +433,7 @@ export async function getSkillsList(): Promise<SkillsListApiResponse> {
 export async function getSkillContent(skillId: string): Promise<{
   content: string;
 }> {
-  const res = await fetch(
+  const res = await authFetch(
     `${BASE}/api/skills/${encodeURIComponent(skillId)}/content`,
   );
   if (!res.ok) throw new Error(await res.text());
@@ -403,7 +444,7 @@ export async function addSkillsPackage(options: {
   package: string;
   skills?: string[];
 }): Promise<SkillsListResponse> {
-  const res = await fetch(`${BASE}/api/skills/add`, {
+  const res = await authFetch(`${BASE}/api/skills/add`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(options),
@@ -415,7 +456,7 @@ export async function addSkillsPackage(options: {
 export async function removeSkillsPackage(
   skills: string[],
 ): Promise<SkillsListResponse> {
-  const res = await fetch(`${BASE}/api/skills/remove`, {
+  const res = await authFetch(`${BASE}/api/skills/remove`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ skills }),

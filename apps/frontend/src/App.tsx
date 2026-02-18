@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { Chat } from "./components/Chat";
@@ -9,11 +9,8 @@ import { Audit } from "./components/Audit";
 import { Safety } from "./components/Safety";
 import { Capabilities } from "./components/Capabilities";
 import { Settings } from "./components/Settings";
-import { getChatHistory, clearChatHistory } from "./api";
+import { Login } from "./components/Login";
 import type { View } from "./types";
-import type { ChatMessage } from "./types";
-
-const CHAT_PAGE_SIZE = 50;
 
 const VIEW_LABELS: Record<View, string> = {
   chat: "Chat",
@@ -75,56 +72,11 @@ function Layout() {
 }
 
 export default function App() {
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatTotal, setChatTotal] = useState(0);
-  const [chatPage, setChatPage] = useState(1);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-
-  useEffect(() => {
-    getChatHistory({ page: 1, pageSize: CHAT_PAGE_SIZE }).then((r) => {
-      setChatMessages(r.messages ?? []);
-      setChatTotal(r.total ?? 0);
-      setChatPage(1);
-    });
-  }, []);
-
-  const loadOlderChat = useCallback(() => {
-    if (loadingOlder || chatTotal <= chatMessages.length) return;
-    setLoadingOlder(true);
-    getChatHistory({ page: chatPage + 1, pageSize: CHAT_PAGE_SIZE })
-      .then((r) => {
-        setChatMessages((prev) => [...(r.messages ?? []), ...prev]);
-        setChatTotal(r.total ?? 0);
-        setChatPage((p) => p + 1);
-      })
-      .finally(() => setLoadingOlder(false));
-  }, [chatPage, chatTotal, chatMessages.length, loadingOlder]);
-
-  const handleClearChat = useCallback(async () => {
-    const { cleared } = await clearChatHistory();
-    if (cleared) {
-      setChatMessages([]);
-      setChatTotal(0);
-      setChatPage(1);
-    }
-  }, []);
-
   return (
     <Routes>
+      <Route path="login" element={<Login />} />
       <Route element={<Layout />}>
-        <Route
-          index
-          element={
-            <Chat
-              messages={chatMessages}
-              setMessages={setChatMessages}
-              hasMoreOlder={chatTotal > chatMessages.length}
-              onLoadOlder={loadOlderChat}
-              loadingOlder={loadingOlder}
-              onClearChat={handleClearChat}
-            />
-          }
-        />
+        <Route index element={<Chat />} />
         <Route path="chat" element={<Navigate to="/" replace />} />
         <Route path="channels" element={<Channels />} />
         <Route path="schedule" element={<Schedule />} />

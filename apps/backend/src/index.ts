@@ -15,6 +15,7 @@ import { getConfig, loadPersisted } from "./config.js";
 import { loadPrompts } from "./prompts.js";
 import { registerRoutes } from "./routes/index.js";
 import { localhostOnly } from "./middleware/localhost-only.js";
+import { authJwt, verifyToken } from "./middleware/auth-jwt.js";
 import { initDb } from "./data/db.js";
 import { initChatHistory } from "./data/chat-history.js";
 import { initAttachmentStore } from "./data/attachment-store.js";
@@ -29,7 +30,7 @@ import { createSubscriber, publish } from "./data/pubsub.js";
 import { createEventQueue } from "./events/event-queue.js";
 import { initRedis } from "./data/redis.js";
 import { initKillSwitch } from "./agents/kill-switch.js";
-import { env } from "./env.js";
+import { env, isWebAuthEnabled } from "./env.js";
 import {
   getWorkspaceAttachmentsDir,
   WORKSPACE_ROOT,
@@ -102,12 +103,39 @@ async function main() {
   const app = express();
   app.use(cors({ origin: true }));
   app.use(express.json());
-  app.use(localhostOnly);
+  if (!isWebAuthEnabled()) {
+    app.use(localhostOnly);
+  } else {
+    app.use(authJwt);
+  }
 
   const server = http.createServer(app);
   const io = new SocketServer(server, {
     cors: { origin: true },
     path: "/socket.io",
+  });
+
+  io.use((socket, next) => {
+    if (!isWebAuthEnabled()) {
+      next();
+      return;
+    }
+    const token =
+      (socket.handshake.auth?.token as string) ??
+      (socket.handshake.headers.authorization?.replace(
+        /^Bearer\s+/i,
+        "",
+      ) as string);
+    if (!token) {
+      next(new Error("Unauthorized"));
+      return;
+    }
+    verifyToken(token)
+      .then((payload) => {
+        if (payload) next();
+        else next(new Error("Unauthorized"));
+      })
+      .catch(() => next(new Error("Unauthorized")));
   });
 
   // Subscribe to audit channel so worker-added entries trigger Socket.IO emit to refresh Audit UI

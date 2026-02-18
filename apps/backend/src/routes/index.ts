@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { AppContext } from "./helpers.js";
+import { registerAuthRoutes } from "./auth.js";
 import { registerInternalRoutes } from "./internal.js";
 import { registerSettingsRoutes } from "./settings.js";
 import { registerChatRoutes } from "./chat.js";
@@ -12,6 +13,7 @@ import { registerScheduleRoutes } from "./schedule.js";
 export type { AppContext };
 
 export function registerRoutes(app: Express, ctx: AppContext): void {
+  registerAuthRoutes(app);
   registerInternalRoutes(app, ctx);
   registerSettingsRoutes(app, ctx);
   registerChatRoutes(app, ctx);

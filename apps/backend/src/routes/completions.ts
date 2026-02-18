@@ -3,6 +3,13 @@ import { randomUUID } from "crypto";
 import type { AppContext } from "./helpers.js";
 import { getKillSwitchEnabled } from "../agents/kill-switch.js";
 import { getConfig } from "../config.js";
+import { completionsAuth } from "../middleware/completions-auth.js";
+
+/** Paths for the completions API; excluded from JWT and used as public paths when exposed (e.g. ngrok). */
+export const COMPLETION_ROUTES = new Set([
+  "/v1/chat/completions",
+  "/chat/completions",
+]);
 
 const POLL_INTERVAL_MS = 200;
 const WAIT_TIMEOUT_MS = 90_000;
@@ -54,32 +61,6 @@ export function registerCompletionsRoutes(app: Express, ctx: AppContext): void {
         error: {
           message: `${getConfig().AGENT_NAME} is paused (kill switch).`,
           type: "server_error",
-        },
-      });
-      return;
-    }
-
-    const expectedKey = getConfig().COMPLETIONS_API_KEY?.trim();
-    if (!expectedKey) {
-      res.status(401).json({
-        error: {
-          message:
-            "Completions API key not configured. Set COMPLETIONS_API_KEY in Settings.",
-          type: "invalid_request_error",
-        },
-      });
-      return;
-    }
-    const auth = req.headers.authorization;
-    const token =
-      typeof auth === "string" && auth.toLowerCase().startsWith("bearer ")
-        ? auth.slice(7).trim()
-        : "";
-    if (token !== expectedKey) {
-      res.status(401).json({
-        error: {
-          message: "Invalid or missing Bearer token.",
-          type: "invalid_request_error",
         },
       });
       return;
@@ -157,6 +138,7 @@ export function registerCompletionsRoutes(app: Express, ctx: AppContext): void {
     });
   };
 
-  app.post("/v1/chat/completions", completionsHandler);
-  app.post("/chat/completions", completionsHandler);
+  for (const path of COMPLETION_ROUTES) {
+    app.post(path, completionsAuth, completionsHandler);
+  }
 }

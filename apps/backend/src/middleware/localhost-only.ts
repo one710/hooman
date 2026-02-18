@@ -1,7 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-
-/** Paths that are allowed when the request is from the public (e.g. via ngrok). All other paths 403. */
-const PUBLIC_PATHS = new Set(["/v1/chat/completions", "/chat/completions"]);
+import { COMPLETION_ROUTES } from "../routes/completions.js";
 
 const LOCALHOST_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
@@ -31,7 +29,7 @@ function isFromPublic(req: Request): boolean {
 }
 
 /**
- * When the server is exposed via ngrok (or similar), only PUBLIC_PATHS are allowed for
+ * When the server is exposed via ngrok (or similar), only COMPLETION_ROUTES are allowed for
  * requests that come from the public. Requests from localhost can access all endpoints.
  */
 export function localhostOnly(
@@ -43,7 +41,7 @@ export function localhostOnly(
     next();
     return;
   }
-  if (PUBLIC_PATHS.has(req.path)) {
+  if (COMPLETION_ROUTES.has(req.path)) {
     next();
     return;
   }

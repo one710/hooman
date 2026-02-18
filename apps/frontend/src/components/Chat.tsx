@@ -2,7 +2,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import createDebug from "debug";
 import { Trash2, Loader2 } from "lucide-react";
 import type { ChatMessage as ChatMessageType } from "../types";
-import { sendMessage, type ChatAttachmentMeta } from "../api";
+import {
+  sendMessage,
+  getChatHistory,
+  clearChatHistory,
+  type ChatAttachmentMeta,
+} from "../api";
+import { getToken } from "../auth";
 import { waitForChatResult } from "../socket";
 import { useDialog } from "./Dialog";
 import { Button } from "./Button";
@@ -10,30 +16,40 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput, type QueuedMessage } from "./ChatInput";
 
 const debug = createDebug("hooman:Chat");
+const CHAT_PAGE_SIZE = 50;
 
-interface ChatProps {
-  messages: ChatMessageType[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessageType[]>>;
-  hasMoreOlder?: boolean;
-  onLoadOlder?: () => void;
-  loadingOlder?: boolean;
-  onClearChat?: () => Promise<void>;
-}
-
-export function Chat({
-  messages,
-  setMessages,
-  hasMoreOlder,
-  onLoadOlder,
-  loadingOlder,
-  onClearChat,
-}: ChatProps) {
+export function Chat() {
   const dialog = useDialog();
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+  const [chatTotal, setChatTotal] = useState(0);
+  const [chatPage, setChatPage] = useState(1);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const queueRef = useRef<QueuedMessage[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    getChatHistory({ page: 1, pageSize: CHAT_PAGE_SIZE }).then((r) => {
+      setMessages(r.messages ?? []);
+      setChatTotal(r.total ?? 0);
+      setChatPage(1);
+    });
+  }, []);
+
+  const loadOlderChat = useCallback(() => {
+    if (loadingOlder || chatTotal <= messages.length) return;
+    setLoadingOlder(true);
+    getChatHistory({ page: chatPage + 1, pageSize: CHAT_PAGE_SIZE })
+      .then((r) => {
+        setMessages((prev) => [...(r.messages ?? []), ...prev]);
+        setChatTotal(r.total ?? 0);
+        setChatPage((p) => p + 1);
+      })
+      .finally(() => setLoadingOlder(false));
+  }, [chatPage, chatTotal, messages.length, loadingOlder]);
 
   const sendOne = useCallback(
     async (text: string, attachmentIds?: string[]) => {
@@ -123,7 +139,7 @@ export function Chat({
   }
 
   async function handleClearChat() {
-    if (!onClearChat || clearing) return;
+    if (clearing) return;
     const ok = await dialog.confirm({
       title: "Clear chat history",
       message: "Clear all chat history? This cannot be undone.",
@@ -133,7 +149,12 @@ export function Chat({
     if (!ok) return;
     setClearing(true);
     try {
-      await onClearChat();
+      const { cleared } = await clearChatHistory();
+      if (cleared) {
+        setMessages([]);
+        setChatTotal(0);
+        setChatPage(1);
+      }
     } catch (e) {
       debug("%o", e);
     } finally {
@@ -156,28 +177,26 @@ export function Chat({
             Have a conversation with Hooman and get things done.
           </p>
         </div>
-        {onClearChat && (
-          <Button
-            variant="danger"
-            size="sm"
-            icon={<Trash2 className="w-4 h-4" />}
-            onClick={handleClearChat}
-            disabled={clearing || messages.length === 0}
-            className="shrink-0"
-          >
-            <span className="hidden sm:inline">
-              {clearing ? "Clearing…" : "Clear chat"}
-            </span>
-          </Button>
-        )}
+        <Button
+          variant="danger"
+          size="sm"
+          icon={<Trash2 className="w-4 h-4" />}
+          onClick={handleClearChat}
+          disabled={clearing || messages.length === 0}
+          className="shrink-0"
+        >
+          <span className="hidden sm:inline">
+            {clearing ? "Clearing…" : "Clear chat"}
+          </span>
+        </Button>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
-        {hasMoreOlder && onLoadOlder && (
+        {chatTotal > messages.length && (
           <div className="flex justify-center">
             <Button
               variant="ghost"
               size="sm"
-              onClick={onLoadOlder}
+              onClick={loadOlderChat}
               disabled={loadingOlder}
             >
               {loadingOlder ? "Loading…" : "Load older messages"}

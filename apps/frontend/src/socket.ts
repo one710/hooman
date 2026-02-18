@@ -19,9 +19,12 @@ export interface ChatResultPayload {
   message: ChatResultMessage;
 }
 
+import { getToken } from "./auth";
+
 /**
  * Connect to the API's Socket.IO server. Call once (e.g. when the app or Chat mounts).
  * Uses the same base as the API (VITE_API_BASE or http://localhost:3000 in dev).
+ * When web auth is enabled, passes JWT in auth for Socket.IO middleware.
  */
 export function getSocket(baseUrl?: string): Socket {
   const url = (
@@ -32,12 +35,22 @@ export function getSocket(baseUrl?: string): Socket {
   const origin = url || "http://localhost:3000";
   if (socketInstance?.connected) return socketInstance;
   if (socketInstance) socketInstance.disconnect();
+  const token = getToken();
   socketInstance = io(origin, {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     autoConnect: true,
+    auth: token ? { token } : {},
   });
   return socketInstance;
+}
+
+/** Disconnect and clear cached socket (e.g. after login so next getSocket() uses new token). */
+export function resetSocket(): void {
+  if (socketInstance) {
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
 }
 
 /**
