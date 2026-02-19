@@ -182,11 +182,7 @@ async function main() {
         const list = responseStore.get(eventId) ?? [];
         list.push({ role: "assistant", text: message.text });
         responseStore.set(eventId, list);
-        auditLog.emitResponse({
-          type: "response",
-          text: message.text,
-          eventId,
-        });
+        // Audit entry already written by event-queue worker; do not emit again
       } catch (err) {
         debug("response_delivery parse error: %o", err);
       }
@@ -213,11 +209,7 @@ async function main() {
         const list = responseStore.get(payload.eventId) ?? [];
         list.push({ role: "assistant", text: payload.message.text });
         responseStore.set(payload.eventId, list);
-        auditLog.emitResponse({
-          type: "response",
-          text: payload.message.text,
-          eventId: payload.eventId,
-        });
+        // Audit entry already written by handler (appendAuditEntry + emitResponse); do not emit again
       },
     });
   }
