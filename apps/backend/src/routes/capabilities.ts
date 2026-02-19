@@ -21,6 +21,7 @@ import {
   getAndClearPendingAuthUrl,
 } from "../mcp/oauth-provider.js";
 import { env } from "../env.js";
+import { setReloadFlag } from "../data/reload-flag.js";
 
 const debug = createDebug("hooman:routes:capabilities");
 
@@ -174,6 +175,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
         return;
       }
       await mcpConnectionsStore.addOrUpdate(conn);
+      if (env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       res.status(201).json({ connection: maskConnectionForResponse(conn) });
     },
   );
@@ -228,6 +230,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
             existingHttp.oauth_client_information;
       }
       await mcpConnectionsStore.addOrUpdate(merged);
+      if (env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       res.json({ connection: maskConnectionForResponse(merged) });
     },
   );
@@ -240,6 +243,7 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
         res.status(404).json({ error: "MCP connection not found." });
         return;
       }
+      if (env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       res.status(204).send();
     },
   );

@@ -45,7 +45,13 @@ export function Settings() {
 
   useEffect(() => {
     getConfig()
-      .then((c) => setForm({ ...c }))
+      .then((c) =>
+        setForm({
+          ...c,
+          OPENAI_WEB_SEARCH: Boolean(c.OPENAI_WEB_SEARCH),
+          MCP_USE_SERVER_MANAGER: Boolean(c.MCP_USE_SERVER_MANAGER),
+        }),
+      )
       .catch((e) => setMessage({ type: "err", text: (e as Error).message }))
       .finally(() => setLoading(false));
   }, []);
@@ -835,7 +841,9 @@ export function Settings() {
             id="web-search"
             checked={form.OPENAI_WEB_SEARCH ?? false}
             onChange={(checked) =>
-              setForm((f) => (f ? { ...f, OPENAI_WEB_SEARCH: checked } : f))
+              setForm((prev) =>
+                prev ? { ...prev, OPENAI_WEB_SEARCH: checked } : prev,
+              )
             }
             label="Enable web search"
           />
@@ -852,8 +860,8 @@ export function Settings() {
               label="Use server manager (graceful failures, reconnect)"
               checked={form.MCP_USE_SERVER_MANAGER ?? false}
               onChange={(checked) =>
-                setForm((f) =>
-                  f ? { ...f, MCP_USE_SERVER_MANAGER: checked } : f,
+                setForm((prev) =>
+                  prev ? { ...prev, MCP_USE_SERVER_MANAGER: checked } : prev,
                 )
               }
             />

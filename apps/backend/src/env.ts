@@ -41,6 +41,10 @@ export const env = {
   WEB_AUTH_PASSWORD_HASH: str("WEB_AUTH_PASSWORD_HASH", ""),
   /** Secret to sign JWTs when web auth is enabled. */
   JWT_SECRET: str("JWT_SECRET", ""),
+  /** MCP manager: max ms to build session (connect all MCPs). Default 5 minutes. */
+  MCP_CONNECT_TIMEOUT_MS: num("MCP_CONNECT_TIMEOUT_MS", 300_000),
+  /** MCP manager: max ms to close session. Default 10 seconds. */
+  MCP_CLOSE_TIMEOUT_MS: num("MCP_CLOSE_TIMEOUT_MS", 10_000),
 } as const;
 
 export { BACKEND_ROOT, PROJECT_ROOT, WORKSPACE_ROOT };

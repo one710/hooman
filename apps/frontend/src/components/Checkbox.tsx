@@ -15,9 +15,19 @@ export function Checkbox({
   label,
   disabled,
 }: CheckboxProps) {
+  const handleLabelClick = (e: React.MouseEvent<HTMLLabelElement>) => {
+    if (disabled) return;
+    if (e.target instanceof HTMLInputElement && e.target.type === "checkbox") {
+      return;
+    }
+    e.preventDefault();
+    onChange(!checked);
+  };
+
   return (
     <label
       htmlFor={id}
+      onClick={handleLabelClick}
       className={`flex items-center gap-2 cursor-pointer select-none w-fit ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <input

@@ -6,7 +6,7 @@
 import createDebug from "debug";
 import { randomUUID } from "crypto";
 import { mkdirSync } from "fs";
-import { loadPersisted } from "../config.js";
+import { getConfig, loadPersisted } from "../config.js";
 import { createEventQueue } from "../events/event-queue.js";
 import { EventRouter } from "../events/event-router.js";
 import { registerEventHandlers } from "../events/event-handlers.js";
@@ -24,6 +24,8 @@ import {
 import { publish } from "../data/pubsub.js";
 import { initRedis, closeRedis } from "../data/redis.js";
 import { initKillSwitch, closeKillSwitch } from "../agents/kill-switch.js";
+import { McpManager } from "../agents/mcp-manager.js";
+import { initReloadWatch, closeReloadWatch } from "../data/reload-flag.js";
 import { env } from "../env.js";
 import { RESPONSE_DELIVERY_CHANNEL } from "../types.js";
 import { WORKSPACE_ROOT, WORKSPACE_MCPCWD } from "../workspace.js";
@@ -61,6 +63,21 @@ async function main() {
   });
   const auditLog = new AuditLog(auditStore);
 
+  const useMcpManager = getConfig().MCP_USE_SERVER_MANAGER;
+  debug(
+    "MCP_USE_SERVER_MANAGER=%s (restart event-queue worker after changing in Settings)",
+    useMcpManager,
+  );
+  let mcpManager: McpManager | undefined;
+  if (useMcpManager) {
+    mcpManager = new McpManager(mcpConnectionsStore, scheduler, {
+      connectTimeoutMs: env.MCP_CONNECT_TIMEOUT_MS,
+      closeTimeoutMs: env.MCP_CLOSE_TIMEOUT_MS,
+    });
+    initReloadWatch(env.REDIS_URL, ["mcp"], () => mcpManager?.reload());
+    debug("MCP Server Manager enabled; watching reload scope 'mcp'");
+  }
+
   const eventRouter = new EventRouter();
   registerEventHandlers({
     eventRouter,
@@ -71,6 +88,7 @@ async function main() {
     publishResponseDelivery: (payload) => {
       publish(RESPONSE_DELIVERY_CHANNEL, JSON.stringify(payload));
     },
+    mcpManager,
   });
 
   const eventQueue = createEventQueue({ connection: env.REDIS_URL });
@@ -90,8 +108,10 @@ async function main() {
 
   const shutdown = async () => {
     debug("Shutting down event-queue worker…");
+    await closeReloadWatch();
     await closeKillSwitch();
     await eventQueue.close();
+    await mcpManager?.reload();
     await closeRedis();
     process.exit(0);
   };

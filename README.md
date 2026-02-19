@@ -272,8 +272,10 @@ When running locally, create a `.env` from `.env.example`. Key variables:
 | `WEB_AUTH_USERNAME`      | No       | When set with `WEB_AUTH_PASSWORD_HASH` and `JWT_SECRET`, enables login; API is reachable from any host.         |
 | `WEB_AUTH_PASSWORD_HASH` | No       | Argon2id hash of password. Generate with `yarn hash-password` and add the printed line to `.env`.               |
 | `JWT_SECRET`             | No       | Secret to sign JWTs when web auth is enabled. Use a strong value (e.g. 32+ random bytes).                       |
+| `MCP_CONNECT_TIMEOUT_MS` | No       | When MCP Server Manager is enabled (Settings): max ms to build the shared MCP session (default 300000 = 5 min). |
+| `MCP_CLOSE_TIMEOUT_MS`   | No       | When MCP Server Manager is enabled: max ms to close the session on reload/shutdown (default 10000).             |
 
-All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, models, and web search are set in the **Settings** UI (persisted by the API), not via env.
+All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, models, and web search are set in the **Settings** UI (persisted by the API), not via env. **MCP Server Manager** (Settings → “Use server manager”) reuses one MCP session in the event-queue worker; restart the event-queue worker after toggling it so the new value is picked up.
 
 ---
 
