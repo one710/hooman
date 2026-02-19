@@ -19,7 +19,7 @@ import {
 import {
   createOAuthProvider,
   getAndClearPendingAuthUrl,
-} from "../mcp/oauth-provider.js";
+} from "../agents/oauth-provider.js";
 import { env } from "../env.js";
 import { setReloadFlag } from "../data/reload-flag.js";
 

@@ -12,7 +12,7 @@ import type {
 } from "../types.js";
 import { WORKSPACE_ROOT } from "../workspace.js";
 import { env } from "../env.js";
-import { transcribeAudio } from "../lib/transcription.js";
+import { transcribeAudio } from "../agents/transcription.js";
 import wweb from "whatsapp-web.js";
 
 const { Client, LocalAuth } = wweb;

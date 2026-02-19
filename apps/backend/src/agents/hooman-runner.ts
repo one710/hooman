@@ -31,7 +31,7 @@ import {
 import type { ScheduleService } from "../data/scheduler.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import { setReloadFlag } from "../data/reload-flag.js";
-import { createOAuthProvider } from "../mcp/oauth-provider.js";
+import { createOAuthProvider } from "./oauth-provider.js";
 import { env, BACKEND_ROOT } from "../env.js";
 import { join } from "path";
 import createDebug from "debug";
