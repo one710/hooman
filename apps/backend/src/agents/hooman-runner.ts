@@ -16,6 +16,7 @@ import type { ModelMessage } from "ai";
 import { listSkillsFromFs, getSkillContent } from "./skills-cli.js";
 import type { SkillEntry } from "./skills-cli.js";
 import type {
+  AuditLogEntry,
   MCPConnection,
   MCPConnectionHosted,
   MCPConnectionStreamableHttp,
@@ -37,6 +38,7 @@ import createDebug from "debug";
 
 const debug = createDebug("hooman:hooman-runner");
 const DEBUG_TOOL_LOG_MAX = 500; // max chars for args/result in logs
+const AUDIT_TOOL_PAYLOAD_MAX = 250; // max chars for tool args/result in audit log
 
 function truncateForLog(value: unknown): string {
   const s =
@@ -47,6 +49,17 @@ function truncateForLog(value: unknown): string {
         : String(value);
   if (s.length <= DEBUG_TOOL_LOG_MAX) return s;
   return `${s.slice(0, DEBUG_TOOL_LOG_MAX)}… (${s.length} chars total)`;
+}
+
+function truncateForAudit(value: unknown): string {
+  const s =
+    typeof value === "string"
+      ? value
+      : typeof value === "object" && value !== null
+        ? JSON.stringify(value)
+        : String(value);
+  if (s.length <= AUDIT_TOOL_PAYLOAD_MAX) return s;
+  return `${s.slice(0, AUDIT_TOOL_PAYLOAD_MAX)}… (${s.length} chars total)`;
 }
 
 const DEFAULT_CHAT_MODEL = "gpt-4o";
@@ -496,12 +509,19 @@ export interface HoomanRunnerSession {
   closeMcp: () => Promise<void>;
 }
 
+export type AuditLogAppender = {
+  appendAuditEntry(
+    entry: Omit<AuditLogEntry, "id" | "timestamp">,
+  ): Promise<void>;
+};
+
 export async function createHoomanRunner(options?: {
   connections?: MCPConnection[];
   scheduleService?: ScheduleService;
   mcpConnectionsStore?: MCPConnectionsStore;
   apiKey?: string;
   model?: string;
+  auditLog?: AuditLogAppender;
 }): Promise<HoomanRunnerSession> {
   const config = getConfig();
   const model = getHoomanModel(config, {
@@ -674,23 +694,45 @@ export async function createHoomanRunner(options?: {
         tools,
         stopWhen: stepCountIs(maxSteps),
         onStepFinish(step) {
-          for (const toolCall of step.toolCalls ?? []) {
+          const calls = step.toolCalls ?? [];
+          const results = step.toolResults ?? [];
+          for (let i = 0; i < calls.length; i++) {
+            const toolCall = calls[i] as { toolName: string; input?: unknown };
             debug(
               "Tool call: %s args=%s",
               toolCall.toolName,
-              truncateForLog((toolCall as { input?: unknown }).input),
+              truncateForLog(toolCall.input),
             );
-          }
-          for (const tr of step.toolResults ?? []) {
-            const resultPart = tr as {
-              toolName: string;
-              output?: unknown;
-            };
-            debug(
-              "Tool result: %s result=%s",
-              resultPart.toolName,
-              truncateForLog(resultPart.output),
-            );
+            if (options?.auditLog) {
+              void options.auditLog.appendAuditEntry({
+                type: "tool_call_start",
+                payload: {
+                  toolName: toolCall.toolName,
+                  input: truncateForAudit(toolCall.input),
+                },
+              });
+            }
+            const resultPart = results[i] as
+              | { toolName: string; output?: unknown }
+              | undefined;
+            if (resultPart) {
+              debug(
+                "Tool result: %s result=%s",
+                resultPart.toolName,
+                truncateForLog(resultPart.output),
+              );
+            }
+            if (options?.auditLog) {
+              void options.auditLog.appendAuditEntry({
+                type: "tool_call_end",
+                payload: {
+                  toolName: toolCall.toolName,
+                  result: resultPart
+                    ? truncateForAudit(resultPart.output)
+                    : "(no result)",
+                },
+              });
+            }
           }
         },
       });

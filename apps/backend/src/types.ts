@@ -263,9 +263,10 @@ export interface AuditLogEntry {
     | "permission"
     | "memory_write"
     | "escalation"
-    | "agent_run"
     | "scheduled_task"
-    | "incoming_message";
+    | "incoming_message"
+    | "tool_call_start"
+    | "tool_call_end";
   payload: Record<string, unknown>;
 }
 

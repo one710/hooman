@@ -228,6 +228,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             connections: await mcpConnectionsStore.getAll(),
             scheduleService: scheduler,
             mcpConnectionsStore,
+            auditLog,
           });
       try {
         const channelContext = buildChannelContext(
@@ -247,13 +248,6 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         assistantText =
           finalOutput?.trim() ||
           "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
-        await auditLog.appendAuditEntry({
-          type: "agent_run",
-          payload: {
-            userInput: text,
-            response: assistantText,
-          },
-        });
         auditLog.emitResponse({
           type: "response",
           text: assistantText,
@@ -328,6 +322,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             connections: await mcpConnectionsStore.getAll(),
             scheduleService: scheduler,
             mcpConnectionsStore,
+            auditLog,
           });
       try {
         const { finalOutput } = await session.runChat([], text, {});
@@ -341,13 +336,6 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             context: payload.context,
             ...(payload.execute_at ? { execute_at: payload.execute_at } : {}),
             ...(payload.cron ? { cron: payload.cron } : {}),
-          },
-        });
-        await auditLog.appendAuditEntry({
-          type: "agent_run",
-          payload: {
-            userInput: text,
-            response: assistantText,
           },
         });
         auditLog.emitResponse({

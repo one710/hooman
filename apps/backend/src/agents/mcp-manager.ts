@@ -8,6 +8,7 @@ import type { ScheduleService } from "../data/scheduler.js";
 import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import {
   createHoomanRunner,
+  type AuditLogAppender,
   type HoomanRunnerSession,
 } from "./hooman-runner.js";
 
@@ -20,6 +21,7 @@ const DEFAULT_CLOSE_TIMEOUT_MS = 10_000;
 export type McpManagerOptions = {
   connectTimeoutMs?: number | null;
   closeTimeoutMs?: number | null;
+  auditLog?: AuditLogAppender;
 };
 
 async function runWithTimeout<T>(
@@ -82,6 +84,7 @@ export class McpManager {
   private inFlight: Promise<HoomanRunnerSession> | null = null;
   private readonly connectTimeoutMs: number | null;
   private readonly closeTimeoutMs: number | null;
+  private readonly auditLog?: AuditLogAppender;
 
   constructor(
     private readonly mcpConnectionsStore: MCPConnectionsStore,
@@ -96,6 +99,7 @@ export class McpManager {
       options?.closeTimeoutMs === undefined
         ? DEFAULT_CLOSE_TIMEOUT_MS
         : options.closeTimeoutMs;
+    this.auditLog = options?.auditLog;
   }
 
   /**
@@ -120,6 +124,7 @@ export class McpManager {
         connections,
         scheduleService: this.scheduleService,
         mcpConnectionsStore: this.mcpConnectionsStore,
+        auditLog: this.auditLog,
       });
     };
     const connectError = new Error(

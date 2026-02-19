@@ -69,6 +69,7 @@ async function main() {
     mcpManager = new McpManager(mcpConnectionsStore, scheduler, {
       connectTimeoutMs: env.MCP_CONNECT_TIMEOUT_MS,
       closeTimeoutMs: env.MCP_CLOSE_TIMEOUT_MS,
+      auditLog,
     });
     debug("MCP Server Manager enabled");
   }
@@ -80,6 +81,7 @@ async function main() {
       mcpManager = new McpManager(mcpConnectionsStore, scheduler, {
         connectTimeoutMs: env.MCP_CONNECT_TIMEOUT_MS,
         closeTimeoutMs: env.MCP_CLOSE_TIMEOUT_MS,
+        auditLog,
       });
       debug("MCP Server Manager reload: enabled, manager created");
     } else if (use && mcpManager) {
