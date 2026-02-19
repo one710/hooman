@@ -42,20 +42,19 @@ export async function verifyToken(token: string): Promise<AuthPayload | null> {
   }
 }
 
+/** Paths that skip JWT (any method). */
+const PUBLIC_PATHS = new Set([
+  "/health",
+  "/api/auth/login",
+  "/api/mcp/oauth/callback",
+]);
+
 /**
- * Requires valid JWT for all requests except GET /health and POST /api/auth/login.
+ * Requires valid JWT for all requests except PUBLIC_PATHS and completion routes.
  * Only mount this middleware when web auth is enabled.
  */
 export function authJwt(req: Request, res: Response, next: NextFunction): void {
-  if (req.method === "GET" && req.path === "/health") {
-    next();
-    return;
-  }
-  if (req.method === "POST" && req.path === "/api/auth/login") {
-    next();
-    return;
-  }
-  if (COMPLETION_ROUTES.has(req.path)) {
+  if (PUBLIC_PATHS.has(req.path) || COMPLETION_ROUTES.has(req.path)) {
     next();
     return;
   }
