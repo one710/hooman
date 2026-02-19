@@ -7,7 +7,7 @@
   "scripts": {
     "build": "yarn build:backend && yarn build:frontend",
     "build:backend": "prisma generate --schema=apps/backend/prisma/schema.prisma && tsc -p apps/backend",
-    "build:frontend": "cd apps/frontend && vite build",
+    "build:frontend": "node -r dotenv/config node_modules/.bin/vite build -c apps/frontend/vite.config.ts",
     "dev:api": "tsx watch apps/backend/src/index.ts",
     "dev:frontend": "cd apps/frontend && vite",
     "dev:slack": "tsx watch apps/backend/src/workers/slack.ts",

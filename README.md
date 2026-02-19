@@ -169,6 +169,93 @@ Without these env vars, behavior is unchanged: only localhost can access the web
 
 ---
 
+## Deployment (server behind nginx)
+
+These steps are intended to be run on the server. Replace `hooman.example.com` and `api.hooman.example.com` with your domains in the nginx configs and certbot command.
+
+**1. Install Node, Yarn, Python (uv), Go, Redis**
+
+```bash
+# Install nvm (Node version manager)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# Load nvm in this shell
+\. "$HOME/.nvm/nvm.sh"
+# Install Node 24
+nvm install 24
+# Enable corepack and activate Yarn
+corepack enable
+corepack prepare yarn@stable --activate
+
+# Install uv (Python package manager) and default Python
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install --default
+
+# Install Go (for Slack MCP and other Go-based tools)
+wget https://go.dev/dl/go1.26.0.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.0.linux-amd64.tar.gz
+
+# Install Redis (event queue and kill switch)
+sudo apt update
+sudo apt install redis-server
+```
+
+**2. Clone, build, and run Hooman**
+
+```bash
+# Clone the repo
+git clone https://github.com/vaibhavpandeyvpz/hooman.git
+cd hooman
+# Install dependencies
+yarn install
+# Create .env from example, then edit (VITE_API_BASE, web auth, etc.)
+cp .env.example .env
+# Generate password hash for WEB_AUTH_PASSWORD_HASH; add output to .env
+yarn hash-password
+# Build API and frontend
+yarn build
+# Start API, web, and workers with PM2
+yarn start
+# Configure PM2 to start on system boot (run the sudo command it prints)
+npx pm2 startup
+# Save process list so it restores after reboot
+npx pm2 save
+```
+
+Before `yarn build`, set `VITE_API_BASE` in the repo root `.env` (e.g. `VITE_API_BASE=https://api.hooman.example.com`). The frontend build loads the root `.env`, so the API URL is baked into the bundle. Configure `WEB_AUTH_USERNAME`, `WEB_AUTH_PASSWORD_HASH`, and `JWT_SECRET` in `.env` for web login (see [Exposing the web app](#exposing-the-web-app-optional)).
+
+**3. Serve frontend from nginx and proxy API**
+
+```bash
+# Create web root and copy built frontend
+mkdir -p /var/www/hooman/apps/frontend
+sudo cp -r apps/frontend/dist /var/www/hooman/apps/frontend/
+
+# Add nginx vhost configs (edit server_name in deploy/*.conf first)
+sudo cp deploy/hooman-frontend.conf /etc/nginx/sites-available/
+sudo cp deploy/hooman-api.conf /etc/nginx/sites-available/
+# Enable the sites
+sudo ln -s /etc/nginx/sites-available/hooman-frontend.conf /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/hooman-api.conf /etc/nginx/sites-enabled/
+# Test config and reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Edit `deploy/hooman-frontend.conf` and `deploy/hooman-api.conf` to use your server names before copying.
+
+**4. TLS with Certbot**
+
+```bash
+# Install Certbot for nginx
+sudo apt install python3-certbot-nginx
+# Obtain and install certificates; Certbot configures nginx for HTTPS
+sudo certbot --nginx -d hooman.example.com -d api.hooman.example.com
+```
+
+After deploying, open `https://hooman.example.com` in a browser and sign in (if web auth is enabled).
+
+---
+
 ## Environment
 
 When running locally, create a `.env` from `.env.example`. Key variables:
