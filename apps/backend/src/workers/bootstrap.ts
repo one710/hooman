@@ -1,10 +1,10 @@
 /**
- * Shared bootstrap for channel workers (Slack, WhatsApp, Cron).
- * Handles: loadPersisted -> initExtra -> createDispatchClient -> start -> initRedis -> initReloadWatch -> SIGINT/SIGTERM.
+ * Shared bootstrap for channel workers (Slack, WhatsApp).
+ * Handles: loadPersisted -> initExtra -> initRedis -> start -> initReloadWatch -> SIGINT/SIGTERM.
+ * Workers push events directly to the BullMQ queue (createEventQueue + createQueueDispatcher in their start).
  */
 import createDebug from "debug";
 import { loadPersisted } from "../config.js";
-import { createDispatchClient } from "../dispatch-client.js";
 import { initRedis, closeRedis } from "../data/redis.js";
 import {
   initReloadWatch,
@@ -13,21 +13,19 @@ import {
 } from "../data/reload-flag.js";
 import { env } from "../env.js";
 
-export type DispatchClient = ReturnType<typeof createDispatchClient>;
-
 export interface BootstrapOptions {
   /** Worker name for debug logging. */
   name: string;
   /** Reload scopes to watch (e.g. ["slack"]). Empty = no reload watch. */
   reloadScopes: ReloadScope[];
-  /** Main start function, receives dispatch client. */
-  start: (client: DispatchClient) => Promise<void>;
+  /** Main start function. Worker creates event queue and dispatcher internally when needed. */
+  start: () => Promise<void>;
   /** Called on SIGINT/SIGTERM before closeRedis. */
   stop?: () => Promise<void>;
   /** Extra init before start (e.g. initDb, mkdirSync). */
   initExtra?: () => Promise<void>;
-  /** Called when a reload flag fires. Receives the dispatch client so it can be reused. */
-  onReload?: (client: DispatchClient) => Promise<void>;
+  /** Called when a reload flag fires. */
+  onReload?: () => Promise<void>;
 }
 
 export async function bootstrapWorker(opts: BootstrapOptions): Promise<void> {
@@ -37,27 +35,22 @@ export async function bootstrapWorker(opts: BootstrapOptions): Promise<void> {
 
   if (opts.initExtra) await opts.initExtra();
 
-  const client = createDispatchClient({
-    apiBaseUrl: env.API_BASE_URL,
-    secret: env.INTERNAL_SECRET || undefined,
-  });
-
   if (env.REDIS_URL) {
     initRedis(env.REDIS_URL);
     debug("Redis initialized (%s)", env.REDIS_URL);
   }
 
-  await opts.start(client);
+  await opts.start();
 
   if (env.REDIS_URL && opts.reloadScopes.length && opts.onReload) {
     initReloadWatch(env.REDIS_URL, opts.reloadScopes, async () => {
       debug("Reload flag set; reloading");
       await loadPersisted();
-      await opts.onReload!(client);
+      await opts.onReload!();
     });
   }
 
-  debug("%s worker started; posting to %s", opts.name, env.API_BASE_URL);
+  debug("%s worker started", opts.name);
 
   const shutdown = async () => {
     debug("Shutting down %s worker…", opts.name);

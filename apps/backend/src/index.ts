@@ -5,7 +5,6 @@ import cors from "cors";
 import { Server as SocketServer } from "socket.io";
 
 const debug = createDebug("hooman:api");
-import { EventRouter } from "./events/event-router.js";
 import { AuditLog } from "./audit.js";
 import type { ScheduleService, ScheduledTask } from "./data/scheduler.js";
 import { randomUUID } from "crypto";
@@ -27,7 +26,14 @@ import {
 } from "./data/audit-store.js";
 import { createSubscriber, publish } from "./data/pubsub.js";
 import { createEventQueue } from "./events/event-queue.js";
+import { enqueueRaw } from "./events/enqueue.js";
+import { EventRouter } from "./events/event-router.js";
+import { registerEventHandlers } from "./events/event-handlers.js";
 import { initRedis } from "./data/redis.js";
+import {
+  RESPONSE_DELIVERY_CHANNEL,
+  type ResponseDeliveryPayload,
+} from "./types.js";
 import { initKillSwitch } from "./agents/kill-switch.js";
 import { env, isWebAuthEnabled } from "./env.js";
 import {
@@ -47,14 +53,30 @@ async function main() {
 
   const redisUrl = env.REDIS_URL;
   initRedis(redisUrl);
-
-  const eventRouter = new EventRouter();
   initKillSwitch(redisUrl);
-  const eventQueue = createEventQueue({ connection: redisUrl });
-  eventRouter.setQueueAdapter(eventQueue);
-  debug(
-    "Event queue: Redis + BullMQ; kill switch in Redis; workers process events",
-  );
+
+  let enqueue: (
+    raw: import("./types.js").RawDispatchInput,
+    options?: { correlationId?: string },
+  ) => Promise<string>;
+  let eventRouter: EventRouter | null = null;
+
+  if (redisUrl) {
+    const eventQueue = createEventQueue({ connection: redisUrl });
+    const dedupSet = new Set<string>();
+    enqueue = (raw, opts) =>
+      enqueueRaw(eventQueue, raw, {
+        correlationId: opts?.correlationId,
+        dedupSet,
+      });
+    debug(
+      "Event queue: Redis + BullMQ; producers enqueue directly; workers process events",
+    );
+  } else {
+    eventRouter = new EventRouter();
+    enqueue = (raw, opts) => eventRouter!.dispatch(raw, opts);
+    debug("No Redis: events processed in-memory");
+  }
 
   await initDb();
   debug("Database (Prisma + SQLite) ready");
@@ -145,14 +167,63 @@ async function main() {
       debug("audit-entry-added from Redis, emitting to Socket.IO");
       io.emit("audit-entry-added");
     });
+    pubsub.subscribe(RESPONSE_DELIVERY_CHANNEL, (raw) => {
+      try {
+        const payload = JSON.parse(raw) as ResponseDeliveryPayload;
+        if (payload.channel !== "api") return;
+        const { eventId, message } = payload;
+        if (
+          typeof eventId !== "string" ||
+          !message ||
+          typeof message.text !== "string"
+        )
+          return;
+        io.emit("chat-result", { eventId, message });
+        const list = responseStore.get(eventId) ?? [];
+        list.push({ role: "assistant", text: message.text });
+        responseStore.set(eventId, list);
+        auditLog.emitResponse({
+          type: "response",
+          text: message.text,
+          eventId,
+        });
+      } catch (err) {
+        debug("response_delivery parse error: %o", err);
+      }
+    });
   } else {
     debug(
       "No Redis subscriber (REDIS_URL empty?); audit log will not auto-refresh when workers add entries",
     );
   }
 
+  if (eventRouter) {
+    registerEventHandlers({
+      eventRouter,
+      context,
+      mcpConnectionsStore,
+      auditLog,
+      scheduler,
+      publishResponseDelivery: (payload) => {
+        if (payload.channel !== "api") return;
+        io.emit("chat-result", {
+          eventId: payload.eventId,
+          message: payload.message,
+        });
+        const list = responseStore.get(payload.eventId) ?? [];
+        list.push({ role: "assistant", text: payload.message.text });
+        responseStore.set(payload.eventId, list);
+        auditLog.emitResponse({
+          type: "response",
+          text: payload.message.text,
+          eventId: payload.eventId,
+        });
+      },
+    });
+  }
+
   registerRoutes(app, {
-    eventRouter,
+    enqueue,
     context,
     auditLog,
     responseStore,

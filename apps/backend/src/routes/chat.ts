@@ -10,7 +10,7 @@ import { getConfig } from "../config.js";
 const debug = createDebug("hooman:routes:chat");
 
 export function registerChatRoutes(app: Express, ctx: AppContext): void {
-  const { eventRouter, context, auditLog, attachmentStore } = ctx;
+  const { enqueue, context, auditLog, attachmentStore } = ctx;
   const upload = multer({ storage: multer.memoryStorage() });
 
   app.get("/api/chat/history", async (req: Request, res: Response) => {
@@ -159,7 +159,7 @@ export function registerChatRoutes(app: Express, ctx: AppContext): void {
     const eventId = randomUUID();
     const userId = "default";
 
-    await eventRouter.dispatch(
+    await enqueue(
       {
         source: "api",
         type: "message.sent",

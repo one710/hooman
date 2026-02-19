@@ -27,7 +27,6 @@ export const env = {
   PORT: num("PORT", 3000),
   REDIS_URL: str("REDIS_URL", "redis://localhost:6379"),
   API_BASE_URL: str("API_BASE_URL", "http://localhost:3000"),
-  INTERNAL_SECRET: str("INTERNAL_SECRET", ""),
   DATABASE_URL: str("DATABASE_URL", ""),
   MCP_STDIO_DEFAULT_CWD: str(
     "MCP_STDIO_DEFAULT_CWD",

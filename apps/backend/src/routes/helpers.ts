@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import type { Server as SocketServer } from "socket.io";
-import type { EventRouter } from "../events/event-router.js";
+import type { RawDispatchInput } from "../types.js";
 import type { ContextStore } from "../agents/context.js";
 import type { AuditLog } from "../audit.js";
 import type { ScheduleService } from "../data/scheduler.js";
@@ -8,7 +8,10 @@ import type { MCPConnectionsStore } from "../data/mcp-connections-store.js";
 import type { AttachmentStore } from "../data/attachment-store.js";
 
 export interface AppContext {
-  eventRouter: EventRouter;
+  enqueue: (
+    raw: RawDispatchInput,
+    options?: { correlationId?: string },
+  ) => Promise<string>;
   context: ContextStore;
   auditLog: AuditLog;
   responseStore: Map<

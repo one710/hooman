@@ -265,7 +265,8 @@ When running locally, create a `.env` from `.env.example`. Key variables:
 | `DATABASE_URL`           | No       | Prisma SQLite URL (default: `workspace/hooman.db` at project root).                                             |
 | `PORT`                   | No       | API port (default 3000).                                                                                        |
 | `REDIS_URL`              | Yes\*    | Redis for event queue and kill switch (e.g. `redis://localhost:6379`). Start with `docker compose up -d redis`. |
-| `VITE_API_BASE`          | No       | Set when building for production so the web app can call the API (e.g. `http://localhost:3000`).                |
+| `API_BASE_URL`           | No       | API base URL for capabilities and similar (default `http://localhost:3000`).                                    |
+| `VITE_API_BASE`          | No       | Set when building for production so the web app can call the API (e.g. `https://api.hooman.example.com`).       |
 | `MCP_STDIO_DEFAULT_CWD`  | No       | Working directory for stdio MCP / filesystem server (default: `workspace/mcpcwd`).                              |
 | `SKILLS_CWD`             | No       | Override project root for skills (default: repo root). Skills are in `<project>/.agents/skills`.                |
 | `WEB_AUTH_USERNAME`      | No       | When set with `WEB_AUTH_PASSWORD_HASH` and `JWT_SECRET`, enables login; API is reachable from any host.         |

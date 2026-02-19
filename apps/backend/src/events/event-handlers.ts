@@ -115,12 +115,7 @@ export interface EventHandlerDeps {
   auditLog: AuditLog;
   /** Schedule service for main agent schedule tools (list/create/cancel). When set, worker passes it so the agent can schedule tasks. */
   scheduler?: ScheduleService;
-  /** When set, called for api-source chat to deliver result (API: resolve pending; worker: POST to API). */
-  deliverApiResult?: (
-    eventId: string,
-    message: { role: "assistant"; text: string },
-  ) => void | Promise<void>;
-  /** When set (event-queue worker), publishes response to Redis for Slack/WhatsApp delivery. */
+  /** When set (event-queue worker), publishes response to Redis; API/Slack/WhatsApp subscribers deliver accordingly. */
   publishResponseDelivery?: (payload: ResponseDeliveryPayload) => void;
 }
 
@@ -131,7 +126,6 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     mcpConnectionsStore,
     auditLog,
     scheduler,
-    deliverApiResult,
     publishResponseDelivery,
   } = deps;
 
@@ -141,10 +135,11 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     channelMeta: ChannelMeta | undefined,
     assistantText: string,
   ): void | Promise<void> {
-    if (source === "api" && deliverApiResult) {
-      return deliverApiResult(eventId, {
-        role: "assistant",
-        text: assistantText,
+    if (source === "api" && publishResponseDelivery) {
+      return publishResponseDelivery({
+        channel: "api",
+        eventId,
+        message: { role: "assistant", text: assistantText },
       });
     }
     if (source === "slack" && publishResponseDelivery) {
@@ -191,7 +186,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     }
   });
 
-  // Chat handler: message.sent → run agents; for api source call deliverApiResult when set
+  // Chat handler: message.sent → run agents; dispatch response via publishResponseDelivery when set (api → Socket.IO; slack/whatsapp → Redis)
   eventRouter.register(async (event) => {
     if (event.payload.kind !== "message") return;
     const {

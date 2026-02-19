@@ -115,12 +115,17 @@ export interface SlackChannelMeta extends ChannelMetaBase {
   replyInThread?: boolean;
 }
 
-/** Payload published to Redis for response delivery to Slack or WhatsApp. */
+/** Payload published to Redis for response delivery. API emits via Socket.IO; Slack/WhatsApp send via their clients. */
 export type ResponseDeliveryPayload =
+  | {
+      channel: "api";
+      eventId: string;
+      message: { role: string; text: string };
+    }
   | { channel: "slack"; channelId: string; threadTs?: string; text: string }
   | { channel: "whatsapp"; chatId: string; text: string };
 
-/** Redis channel for response delivery (event-queue publishes; Slack/WhatsApp workers subscribe). */
+/** Redis channel for response delivery (event-queue publishes; API, Slack and WhatsApp workers subscribe). */
 export const RESPONSE_DELIVERY_CHANNEL = "hooman:response_delivery";
 
 /** WhatsApp channel metadata. */

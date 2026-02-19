@@ -50,7 +50,7 @@ function getLastUserMessage(messages: unknown[]): string | null {
 }
 
 export function registerCompletionsRoutes(app: Express, ctx: AppContext): void {
-  const { eventRouter, responseStore } = ctx;
+  const { enqueue, responseStore } = ctx;
 
   const completionsHandler = async (
     req: Request,
@@ -91,7 +91,7 @@ export function registerCompletionsRoutes(app: Express, ctx: AppContext): void {
     const eventId = randomUUID();
     const userId = "default";
 
-    await eventRouter.dispatch(
+    await enqueue(
       {
         source: "api",
         type: "message.sent",

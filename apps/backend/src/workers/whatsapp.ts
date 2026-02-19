@@ -1,6 +1,6 @@
 /**
- * WhatsApp worker: runs the WhatsApp channel adapter, posting events to API via POST /api/internal/dispatch.
- * Subscribes to Redis for MCP requests (hooman:mcp:whatsapp:request) and runs them via the adapter.
+ * WhatsApp worker: runs the WhatsApp channel adapter, enqueues message events directly to BullMQ.
+ * Subscribes to Redis for MCP requests (hooman:mcp:whatsapp:request) and response delivery.
  * Respects channel on/off: at startup and when Redis reload flag is set (e.g. after PATCH /api/channels).
  * Run as a separate PM2 process (e.g. pm2 start ecosystem.config.cjs --only whatsapp).
  */
@@ -12,9 +12,12 @@ import {
   handleWhatsAppMcpRequest,
   sendMessageToChat,
 } from "../channels/whatsapp-adapter.js";
+import { createEventQueue } from "../events/event-queue.js";
+import { createQueueDispatcher } from "../events/enqueue.js";
 import { createSubscriber, createRpcMessageHandler } from "../data/pubsub.js";
+import { env } from "../env.js";
 import { RESPONSE_DELIVERY_CHANNEL } from "../types.js";
-import { runWorker, type DispatchClient } from "./bootstrap.js";
+import { runWorker } from "./bootstrap.js";
 
 const debug = createDebug("hooman:workers:whatsapp");
 
@@ -23,6 +26,7 @@ const MCP_RESPONSE_CHANNEL = "hooman:mcp:whatsapp:response";
 const CONNECTION_REQUEST_CHANNEL = "hooman:whatsapp:connection:request";
 const CONNECTION_RESPONSE_CHANNEL = "hooman:whatsapp:connection:response";
 
+let eventQueue: ReturnType<typeof createEventQueue> | null = null;
 let mcpSubscriber: ReturnType<typeof createSubscriber> | null = null;
 
 /** Connection state for WhatsApp (QR, status, self identity). API reads this via Redis RPC. */
@@ -33,9 +37,15 @@ let connectionState: {
   selfNumber?: string;
 } = { status: "disconnected" };
 
-async function startAdapter(client: DispatchClient): Promise<void> {
+async function startAdapter(): Promise<void> {
   await stopWhatsAppAdapter();
-  await startWhatsAppAdapter(client, () => getChannelsConfig().whatsapp, {
+  if (!env.REDIS_URL) {
+    debug("REDIS_URL required for WhatsApp worker");
+    return;
+  }
+  eventQueue = createEventQueue({ connection: env.REDIS_URL });
+  const dispatcher = createQueueDispatcher(eventQueue);
+  await startWhatsAppAdapter(dispatcher, () => getChannelsConfig().whatsapp, {
     onConnectionUpdate: ({ status, qr, selfId, selfNumber }) => {
       connectionState =
         status === "connected"
@@ -99,14 +109,18 @@ function setupMcpSubscriber(): void {
 runWorker({
   name: "whatsapp",
   reloadScopes: ["whatsapp"],
-  start: async (client) => {
-    await startAdapter(client);
+  start: async () => {
+    await startAdapter();
     setupMcpSubscriber();
   },
   stop: async () => {
     if (mcpSubscriber) await mcpSubscriber.close();
     mcpSubscriber = null;
+    if (eventQueue) {
+      await eventQueue.close();
+      eventQueue = null;
+    }
     await stopWhatsAppAdapter();
   },
-  onReload: (client) => startAdapter(client),
+  onReload: () => startAdapter(),
 });

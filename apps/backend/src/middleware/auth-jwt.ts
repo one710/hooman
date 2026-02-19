@@ -59,10 +59,6 @@ export function authJwt(req: Request, res: Response, next: NextFunction): void {
     next();
     return;
   }
-  if (req.path.startsWith("/api/internal/")) {
-    next();
-    return;
-  }
   const token = getBearerToken(req);
   if (!token) {
     res

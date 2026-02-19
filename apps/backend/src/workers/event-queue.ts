@@ -1,6 +1,6 @@
 /**
  * Event-queue worker: runs the BullMQ worker that processes events (chat, scheduled tasks).
- * Agents run here. Posts chat results to API via POST /api/internal/chat-result.
+ * Agents run here. Publishes responses to Redis (hooman:response_delivery); API/Slack/WhatsApp subscribers deliver accordingly.
  * Run as a separate PM2 process (e.g. pm2 start ecosystem.config.cjs --only event-queue).
  */
 import createDebug from "debug";
@@ -62,31 +62,12 @@ async function main() {
   const auditLog = new AuditLog(auditStore);
 
   const eventRouter = new EventRouter();
-  const apiBase = env.API_BASE_URL.replace(/\/$/, "");
-  const chatResultUrl = `${apiBase}/api/internal/chat-result`;
-  const internalHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(env.INTERNAL_SECRET
-      ? { "X-Internal-Secret": env.INTERNAL_SECRET }
-      : {}),
-  };
   registerEventHandlers({
     eventRouter,
     context,
     mcpConnectionsStore,
     auditLog,
     scheduler,
-    deliverApiResult: async (eventId, message) => {
-      const res = await fetch(chatResultUrl, {
-        method: "POST",
-        headers: internalHeaders,
-        body: JSON.stringify({ eventId, message }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`chat-result ${res.status}: ${text}`);
-      }
-    },
     publishResponseDelivery: (payload) => {
       publish(RESPONSE_DELIVERY_CHANNEL, JSON.stringify(payload));
     },
@@ -103,8 +84,8 @@ async function main() {
     await eventRouter.runHandlersForEvent(event);
   });
   debug(
-    "Event-queue worker started (agents run here); chat results to %s",
-    chatResultUrl,
+    "Event-queue worker started (agents run here); responses via %s",
+    RESPONSE_DELIVERY_CHANNEL,
   );
 
   const shutdown = async () => {

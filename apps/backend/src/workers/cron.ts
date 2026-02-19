@@ -1,6 +1,6 @@
 /**
  * Cron worker: runs node-schedule for user scheduled tasks.
- * Dispatches to API via POST /api/internal/dispatch. Loads tasks from DB; watches
+ * Enqueues events directly to BullMQ. Loads tasks from DB; watches
  * Redis reload flag and reloads tasks when API sets it (schedule).
  * Run as a separate PM2 process (e.g. pm2 start ecosystem.config.cjs --only cron).
  */
@@ -8,7 +8,8 @@ import createDebug from "debug";
 import schedule from "node-schedule";
 import { mkdirSync } from "fs";
 import { loadPersisted } from "../config.js";
-import { createDispatchClient } from "../dispatch-client.js";
+import { createEventQueue } from "../events/event-queue.js";
+import { createQueueDispatcher } from "../events/enqueue.js";
 import type { RawDispatchInput } from "../types.js";
 import type { ScheduledTask } from "../data/scheduler.js";
 import type { ScheduleStore } from "../data/schedule-store.js";
@@ -113,40 +114,34 @@ async function main() {
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
   await initDb();
 
-  const client = createDispatchClient({
-    apiBaseUrl: env.API_BASE_URL,
-    secret: env.INTERNAL_SECRET || undefined,
-  });
+  if (!env.REDIS_URL) {
+    debug("Cron worker requires REDIS_URL to enqueue events");
+    process.exit(1);
+  }
+  initRedis(env.REDIS_URL);
+  const eventQueue = createEventQueue({ connection: env.REDIS_URL });
+  const dispatcher = createQueueDispatcher(eventQueue);
   const dispatch = (raw: RawDispatchInput) =>
-    client.dispatch(raw).then(() => {});
+    dispatcher.dispatch(raw).then(() => {});
 
   const scheduleStore = await initScheduleStore();
   const scheduler = runCronScheduler(scheduleStore, dispatch);
   await scheduler.load();
-
-  initRedis(env.REDIS_URL);
 
   async function onReload(): Promise<void> {
     debug("Reload flag received; reloading scheduled tasks");
     await scheduler.reload();
   }
 
-  if (env.REDIS_URL) {
-    initReloadWatch(env.REDIS_URL, ["schedule"], onReload);
-    debug(
-      "Cron worker started; dispatching to %s; scheduled tasks; watching Redis reload flag",
-      env.API_BASE_URL,
-    );
-  } else {
-    debug(
-      "Cron worker started; dispatching to %s; scheduled tasks (no Redis, no reload watch)",
-      env.API_BASE_URL,
-    );
-  }
+  initReloadWatch(env.REDIS_URL, ["schedule"], onReload);
+  debug(
+    "Cron worker started; enqueuing to BullMQ; scheduled tasks; watching Redis reload flag",
+  );
 
   const shutdown = async () => {
     await closeReloadWatch();
     scheduler.stop();
+    await eventQueue.close();
     await closeRedis();
     debug("Cron worker stopped.");
     process.exit(0);
