@@ -25,9 +25,7 @@ export function registerChatRoutes(app: Express, ctx: AppContext): void {
       result.messages.map(async (m) => {
         const ids = m.attachments ?? [];
         const timestamp =
-          m.createdAt instanceof Date
-            ? m.createdAt.toISOString()
-            : (m as { createdAt?: string }).createdAt;
+          m.createdAt instanceof Date ? m.createdAt.toISOString() : undefined;
         if (ids.length === 0)
           return {
             role: m.role,
