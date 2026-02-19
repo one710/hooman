@@ -266,7 +266,6 @@ export interface AppConfig {
   TRANSCRIPTION_PROVIDER?: TranscriptionProviderId;
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
-  OPENAI_WEB_SEARCH: boolean;
   MCP_USE_SERVER_MANAGER: boolean;
   OPENAI_TRANSCRIPTION_MODEL: string;
   AGENT_NAME: string;

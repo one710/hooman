@@ -48,7 +48,6 @@ export function Settings() {
       .then((c) =>
         setForm({
           ...c,
-          OPENAI_WEB_SEARCH: Boolean(c.OPENAI_WEB_SEARCH),
           MCP_USE_SERVER_MANAGER: Boolean(c.MCP_USE_SERVER_MANAGER),
         }),
       )
@@ -67,7 +66,6 @@ export function Settings() {
         TRANSCRIPTION_PROVIDER: form.TRANSCRIPTION_PROVIDER ?? "openai",
         OPENAI_API_KEY: form.OPENAI_API_KEY,
         OPENAI_MODEL: form.OPENAI_MODEL,
-        OPENAI_WEB_SEARCH: form.OPENAI_WEB_SEARCH,
         MCP_USE_SERVER_MANAGER: form.MCP_USE_SERVER_MANAGER,
         OPENAI_TRANSCRIPTION_MODEL: form.OPENAI_TRANSCRIPTION_MODEL,
         AGENT_NAME: form.AGENT_NAME,
@@ -837,20 +835,6 @@ export function Settings() {
             </div>
           </div>
 
-          <Checkbox
-            id="web-search"
-            checked={form.OPENAI_WEB_SEARCH ?? false}
-            onChange={(checked) =>
-              setForm((prev) =>
-                prev ? { ...prev, OPENAI_WEB_SEARCH: checked } : prev,
-              )
-            }
-            label="Enable web search"
-          />
-          <p className="text-xs text-hooman-muted -mt-2">
-            When enabled, chat uses the Responses API with web search so the
-            model can look up current information.
-          </p>
           <div className="pt-4 border-t border-hooman-border">
             <h3 className="text-sm font-medium text-zinc-300 mb-2">
               MCP servers
