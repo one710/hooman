@@ -67,6 +67,63 @@ export function registerScheduleRoutes(app: Express, ctx: AppContext): void {
     },
   );
 
+  app.patch(
+    "/api/schedule/:id",
+    async (req: Request, res: Response): Promise<void> => {
+      if (getKillSwitchEnabled()) {
+        res.status(503).json({
+          error: `${getConfig().AGENT_NAME} is paused (kill switch).`,
+        });
+        return;
+      }
+      const id = getParam(req, "id");
+      const { execute_at, intent, context, cron } = req.body ?? {};
+      const cronStr =
+        typeof cron === "string" && cron.trim() !== ""
+          ? cron.trim()
+          : undefined;
+      const executeAtStr =
+        typeof execute_at === "string" && execute_at.trim() !== ""
+          ? execute_at.trim()
+          : undefined;
+
+      if (!intent || typeof intent !== "string") {
+        res.status(400).json({ error: "Missing intent." });
+        return;
+      }
+      if (!executeAtStr && !cronStr) {
+        res.status(400).json({
+          error: "Provide either execute_at (one-shot) or cron (recurring).",
+        });
+        return;
+      }
+
+      try {
+        const ok = await scheduler.update(id, {
+          intent: typeof intent === "string" ? intent : String(intent),
+          context: typeof context === "object" ? context : {},
+          ...(executeAtStr ? { execute_at: executeAtStr } : {}),
+          ...(cronStr ? { cron: cronStr } : {}),
+        });
+        if (!ok) {
+          res.status(404).json({ error: "Scheduled task not found." });
+          return;
+        }
+        res.status(200).json({
+          id,
+          intent: typeof intent === "string" ? intent : String(intent),
+          context: context ?? {},
+          ...(executeAtStr ? { execute_at: executeAtStr } : {}),
+          ...(cronStr ? { cron: cronStr } : {}),
+        });
+      } catch (err) {
+        res.status(400).json({
+          error: err instanceof Error ? err.message : "Schedule failed.",
+        });
+      }
+    },
+  );
+
   app.delete(
     "/api/schedule/:id",
     async (req: Request, res: Response): Promise<void> => {
