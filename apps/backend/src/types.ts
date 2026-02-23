@@ -115,6 +115,9 @@ export interface SlackChannelMeta extends ChannelMetaBase {
   replyInThread?: boolean;
 }
 
+/** When the model outputs this marker, the dispatcher skips sending a reply to the user (no message to channel; web chat gets chat-skipped). */
+export const HOOMAN_SKIP_MARKER = "[hooman:skip]";
+
 /** Payload published to Redis for response delivery. API emits via Socket.IO; Slack/WhatsApp send via their clients. */
 export type ResponseDeliveryPayload =
   | {
@@ -122,6 +125,7 @@ export type ResponseDeliveryPayload =
       eventId: string;
       message: { role: string; text: string };
     }
+  | { channel: "api"; eventId: string; skipped: true }
   | { channel: "slack"; channelId: string; threadTs?: string; text: string }
   | { channel: "whatsapp"; chatId: string; text: string };
 

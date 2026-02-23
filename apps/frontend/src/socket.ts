@@ -19,6 +19,19 @@ export interface ChatResultPayload {
   message: ChatResultMessage;
 }
 
+/** Emitted when the agent chose not to respond ([hooman:skip]). Reject from waitForChatResult so the UI can stop "thinking" without showing a message. */
+export interface ChatSkippedPayload {
+  eventId: string;
+}
+
+/** Thrown when the server emits chat-skipped for the requested eventId (agent chose not to respond). */
+export class ChatSkippedError extends Error {
+  constructor() {
+    super("Chat skipped");
+    this.name = "ChatSkippedError";
+  }
+}
+
 import { getToken } from "./auth";
 
 /**
@@ -55,6 +68,7 @@ export function resetSocket(): void {
 
 /**
  * Wait for a chat-result event with the given eventId. Resolves with the message when the worker posts it.
+ * Rejects with ChatSkippedError when the agent chose not to respond (chat-skipped).
  * Rejects on timeout or if the socket disconnects before receiving the result.
  */
 export function waitForChatResult(
@@ -75,10 +89,16 @@ export function waitForChatResult(
       );
     }, timeoutMs);
 
-    const handler = (payload: ChatResultPayload) => {
+    const resultHandler = (payload: ChatResultPayload) => {
       if (payload.eventId !== eventId) return;
       cleanup();
       resolve(payload.message);
+    };
+
+    const skippedHandler = (payload: ChatSkippedPayload) => {
+      if (payload.eventId !== eventId) return;
+      cleanup();
+      reject(new ChatSkippedError());
     };
 
     const onDisconnect = (reason: string) => {
@@ -88,11 +108,13 @@ export function waitForChatResult(
 
     const cleanup = () => {
       clearTimeout(timeout);
-      s.off("chat-result", handler);
+      s.off("chat-result", resultHandler);
+      s.off("chat-skipped", skippedHandler);
       s.off("disconnect", onDisconnect);
     };
 
-    s.on("chat-result", handler);
+    s.on("chat-result", resultHandler);
+    s.on("chat-skipped", skippedHandler);
     s.once("disconnect", onDisconnect);
     if (s.connected) {
       // already connected

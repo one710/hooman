@@ -222,7 +222,6 @@ const readSkillTool = tool({
 });
 
 export interface RunChatOptions {
-  memoryContext?: string;
   channelContext?: string;
   apiKey?: string;
   model?: string;
@@ -478,12 +477,6 @@ export async function createHoomanRunner(options?: {
   return {
     async runChat(thread, newUserMessage, runOptions) {
       const input: ModelMessage[] = [];
-      if (runOptions?.memoryContext?.trim()) {
-        input.push({
-          role: "user",
-          content: `[Relevant memory from past conversations]\n${runOptions.memoryContext.trim()}\n\n---`,
-        });
-      }
       if (runOptions?.channelContext?.trim()) {
         input.push({
           role: "user",

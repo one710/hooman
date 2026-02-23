@@ -8,7 +8,7 @@ import {
   clearChatHistory,
   type ChatAttachmentMeta,
 } from "../api";
-import { waitForChatResult } from "../socket";
+import { waitForChatResult, ChatSkippedError } from "../socket";
 import { useDialog } from "./Dialog";
 import { Button } from "./Button";
 import { ChatMessage } from "./ChatMessage";
@@ -65,6 +65,10 @@ export function Chat() {
           },
         ]);
       } catch (err) {
+        if (err instanceof ChatSkippedError) {
+          // Agent chose not to respond; stop thinking, do not add a message
+          return;
+        }
         const msg = (err as Error).message;
         const hint =
           !msg ||

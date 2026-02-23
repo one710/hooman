@@ -17,6 +17,7 @@ import type {
   SlackChannelMeta,
   WhatsAppChannelMeta,
 } from "../types.js";
+import { HOOMAN_SKIP_MARKER } from "../types.js";
 
 const debug = createDebug("hooman:event-handlers");
 
@@ -89,6 +90,16 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     channelMeta: ChannelMeta | undefined,
     assistantText: string,
   ): void | Promise<void> {
+    if (assistantText.includes(HOOMAN_SKIP_MARKER)) {
+      if (source === "api" && publishResponseDelivery) {
+        return publishResponseDelivery({
+          channel: "api",
+          eventId,
+          skipped: true,
+        });
+      }
+      return;
+    }
     if (source === "api" && publishResponseDelivery) {
       return publishResponseDelivery({
         channel: "api",
@@ -194,9 +205,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
           runPromise,
           timeoutPromise,
         ]);
-        assistantText =
+        const rawOutput =
           finalOutput?.trim() ||
           "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
+        assistantText = rawOutput;
         auditLog.emitResponse({
           type: "response",
           text: assistantText,

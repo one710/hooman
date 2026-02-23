@@ -25,6 +25,7 @@ import { McpManager } from "../capabilities/mcp/manager.js";
 import { initReloadWatch, closeReloadWatch } from "../utils/reload-flag.js";
 import { env } from "../env.js";
 import { RESPONSE_DELIVERY_CHANNEL } from "../types.js";
+import { loadPrompts } from "../utils/prompts.js";
 import { WORKSPACE_ROOT, WORKSPACE_MCPCWD } from "../utils/workspace.js";
 
 const debug = createDebug("hooman:workers:event-queue");
@@ -36,6 +37,7 @@ async function main() {
   }
 
   await loadPersisted();
+  await loadPrompts();
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
   mkdirSync(WORKSPACE_MCPCWD, { recursive: true });
   await initDb();
