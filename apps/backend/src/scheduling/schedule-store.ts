@@ -4,6 +4,7 @@ import type { ScheduledTask } from "../types.js";
 export interface ScheduleStore {
   getAll(): Promise<ScheduledTask[]>;
   add(task: ScheduledTask): Promise<void>;
+  update(id: string, task: Omit<ScheduledTask, "id">): Promise<boolean>;
   remove(id: string): Promise<boolean>;
 }
 
@@ -54,6 +55,22 @@ export async function initScheduleStore(): Promise<ScheduleStore> {
           cron: task.cron ?? null,
         },
       });
+    },
+
+    async update(
+      id: string,
+      task: Omit<ScheduledTask, "id">,
+    ): Promise<boolean> {
+      const result = await prisma.schedule.updateMany({
+        where: { id },
+        data: {
+          intent: task.intent,
+          context: JSON.stringify(task.context ?? {}),
+          execute_at: task.execute_at ?? null,
+          cron: task.cron ?? null,
+        },
+      });
+      return (result.count ?? 0) > 0;
     },
 
     async remove(id: string): Promise<boolean> {

@@ -348,6 +348,29 @@ export async function createScheduledTask(
   return res.json();
 }
 
+export async function updateScheduledTask(
+  id: string,
+  intent: string,
+  context: Record<string, unknown>,
+  options: { execute_at?: string; cron?: string },
+): Promise<void> {
+  const { execute_at, cron } = options;
+  if (!execute_at && !cron) {
+    throw new Error("Provide either execute_at or cron.");
+  }
+  const res = await authFetch(`${BASE}/api/schedule/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      intent,
+      context,
+      ...(execute_at ? { execute_at } : {}),
+      ...(cron ? { cron } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 export async function cancelScheduledTask(id: string): Promise<void> {
   const res = await authFetch(`${BASE}/api/schedule/${id}`, {
     method: "DELETE",

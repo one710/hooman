@@ -20,6 +20,7 @@ function validateCron(cron: string): boolean {
 export interface ScheduleService {
   list(): Promise<ScheduledTask[]>;
   schedule(task: Omit<ScheduledTask, "id">): Promise<string>;
+  update(id: string, task: Omit<ScheduledTask, "id">): Promise<boolean>;
   cancel(id: string): Promise<boolean>;
 }
 
@@ -37,6 +38,20 @@ export function createScheduleService(store: ScheduleStore): ScheduleService {
       await store.add({ ...task, id });
       await setReloadFlag(env.REDIS_URL, "schedule");
       return id;
+    },
+
+    async update(
+      id: string,
+      task: Omit<ScheduledTask, "id">,
+    ): Promise<boolean> {
+      if (task.cron && !validateCron(task.cron)) {
+        throw new Error("Invalid cron expression.");
+      }
+      const ok = await store.update(id, task);
+      if (ok) {
+        await setReloadFlag(env.REDIS_URL, "schedule");
+      }
+      return ok;
     },
 
     async cancel(id: string): Promise<boolean> {
