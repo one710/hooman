@@ -8,12 +8,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { initRedis, waitForRedis } from "../../data/redis.js";
 import { createRequestResponse } from "../../utils/pubsub.js";
+import { env } from "../../env.js";
 
 const REQUEST_CHANNEL = "hooman:mcp:whatsapp:request";
 const RESPONSE_CHANNEL = "hooman:mcp:whatsapp:response";
 const RPC_TIMEOUT_MS = 25_000;
 
-const redisUrl = process.env.REDIS_URL ?? "";
+const redisUrl = env.REDIS_URL;
 if (!redisUrl) {
   process.exit(1);
 }

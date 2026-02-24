@@ -45,6 +45,10 @@ export const env = {
   MCP_CONNECT_TIMEOUT_MS: num("MCP_CONNECT_TIMEOUT_MS", 300_000),
   /** MCP manager: max ms to close session. Default 10 seconds. */
   MCP_CLOSE_TIMEOUT_MS: num("MCP_CLOSE_TIMEOUT_MS", 10_000),
+  /** ChromaDB URL for memory MCP server. */
+  CHROMA_URL: str("CHROMA_URL", "http://localhost:8000"),
+  /** ChromaDB collection name for memory MCP server. */
+  CHROMA_COLLECTION: str("CHROMA_COLLECTION", "hooman-memory"),
 } as const;
 
 export { BACKEND_ROOT, PROJECT_ROOT, WORKSPACE_ROOT };

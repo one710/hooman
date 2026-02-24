@@ -56,7 +56,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       name: "memory",
       command: "npx",
       args: ["tsx", MEMORY_MCP_SERVER_PATH],
-      env: { CHROMA_URL: "http://localhost:8000" },
+      env: { CHROMA_URL: env.CHROMA_URL },
     },
     {
       id: "_default_schedule",
