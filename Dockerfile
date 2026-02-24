@@ -59,14 +59,15 @@ COPY package.json yarn.lock .npmrc tsconfig.base.json ecosystem.config.cjs ./
 COPY apps/backend ./apps/backend
 COPY scripts ./scripts
 
-# Create workspace directory for SQLite DB, attachments, and MCP cwd
-RUN mkdir -p /app/workspace/attachments /app/workspace/mcpcwd
+# Create workspace directory for SQLite DB and attachments
+RUN mkdir -p /app/workspace/attachments /mcpcwd
 
 # Persist data across container restarts
-VOLUME ["/app/workspace"]
+VOLUME ["/app/workspace", "/mcpcwd"]
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV MCP_STDIO_DEFAULT_CWD=/mcpcwd
 
 EXPOSE 3000
 

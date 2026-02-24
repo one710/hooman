@@ -35,6 +35,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       name: "fetch",
       command: "uvx",
       args: ["mcp-server-fetch"],
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     },
     {
       id: "_default_time",
@@ -42,6 +43,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       name: "time",
       command: "uvx",
       args: ["mcp-server-time"],
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     },
     {
       id: "_default_desktop_commander",
@@ -49,6 +51,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       name: "desktop_commander",
       command: "npx",
       args: ["-y", "@wonderwhy-er/desktop-commander@latest"],
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     },
     {
       id: "_default_memory",
@@ -57,6 +60,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       command: "npx",
       args: ["tsx", MEMORY_MCP_SERVER_PATH],
       env: { CHROMA_URL: env.CHROMA_URL },
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     },
     {
       id: "_default_schedule",
@@ -65,6 +69,7 @@ export function getDefaultMcpConnections(): MCPConnectionStdio[] {
       command: "npx",
       args: ["tsx", SCHEDULE_MCP_SERVER_PATH],
       env: { REDIS_URL: env.REDIS_URL ?? "" },
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     },
   ];
 }
@@ -80,6 +85,7 @@ export function getChannelDefaultMcpConnections(): MCPConnectionStdio[] {
       command: "npx",
       args: ["tsx", WHATSAPP_MCP_SERVER_PATH],
       env: { REDIS_URL: env.REDIS_URL },
+      cwd: env.MCP_STDIO_DEFAULT_CWD,
     });
   }
   return out;
