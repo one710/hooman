@@ -462,14 +462,16 @@ export const McpConnections = forwardRef<McpConnectionsHandle>(
                     />
                   </div>
                 )}
-                <Input
-                  label="Bearer token (optional)"
-                  placeholder="OAuth or API token for servers that require auth"
-                  type="password"
-                  value={bearerToken}
-                  onChange={(e) => setBearerToken(e.target.value)}
-                  autoComplete="off"
-                />
+                {!oauthEnabled && (
+                  <Input
+                    label="Bearer token (optional)"
+                    placeholder="OAuth or API token for servers that require auth"
+                    type="password"
+                    value={bearerToken}
+                    onChange={(e) => setBearerToken(e.target.value)}
+                    autoComplete="off"
+                  />
+                )}
                 <div>
                   <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
                     Custom headers (optional)
@@ -558,14 +560,16 @@ export const McpConnections = forwardRef<McpConnectionsHandle>(
                     setForm((f) => ({ ...f, url: e.target.value }))
                   }
                 />
-                <Input
-                  label="Bearer token (optional)"
-                  placeholder="OAuth or API token for servers that require auth"
-                  type="password"
-                  value={bearerToken}
-                  onChange={(e) => setBearerToken(e.target.value)}
-                  autoComplete="off"
-                />
+                {!oauthEnabled && (
+                  <Input
+                    label="Bearer token (optional)"
+                    placeholder="OAuth or API token for servers that require auth"
+                    type="password"
+                    value={bearerToken}
+                    onChange={(e) => setBearerToken(e.target.value)}
+                    autoComplete="off"
+                  />
+                )}
                 <div>
                   <div className="block text-xs text-hooman-muted uppercase tracking-wide mb-1">
                     Custom headers (optional)
