@@ -56,3 +56,29 @@ export function truncateForMax(value: unknown, maxChars: number): string {
   if (s.length <= maxChars) return s;
   return `${s.slice(0, maxChars)}… (${s.length} chars total)`;
 }
+
+export async function runWithTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number | null,
+  timeoutError: Error,
+): Promise<T> {
+  if (timeoutMs === null) {
+    return fn();
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const task = fn();
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([task, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (timedOut) task.catch(() => undefined);
+  }
+}

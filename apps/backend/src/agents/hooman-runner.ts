@@ -36,23 +36,13 @@ export interface RunChatResult {
   messages?: ModelMessage[];
 }
 
-export interface DiscoveredTool {
-  toolName: string;
-  description?: string;
-  id: string;
-  name: string;
-}
-
-export interface HoomanRunnerSession {
+export interface HoomanRunner {
   generate(
     history: ModelMessage[],
     message: string,
     options?: RunChatOptions,
   ): Promise<RunChatResult>;
 }
-
-/** Session returned by createHoomanRunner; manager composes with tools for HoomanRunnerSession. */
-export type HoomanRunnerCore = Pick<HoomanRunnerSession, "generate">;
 
 export type AuditLogAppender = {
   appendAuditEntry(
@@ -64,7 +54,7 @@ export async function createHoomanRunner(options: {
   agentTools: Record<string, unknown>;
   auditLog?: AuditLogAppender;
   sessionId?: string;
-}): Promise<HoomanRunnerCore> {
+}): Promise<HoomanRunner> {
   const config = getConfig();
   const model = getHoomanModel(config);
 

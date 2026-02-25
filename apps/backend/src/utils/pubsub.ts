@@ -27,7 +27,7 @@ export function publish(channel: string, message: string): void {
   if (redis) void redis.publish(channel, message);
 }
 
-const DEFAULT_RPC_TIMEOUT_MS = 30_000;
+const DEFAULT_RPC_TIMEOUT_MS = 300_000;
 
 /**
  * Request/response over Redis pub/sub with requestId correlation. Uses the shared Redis

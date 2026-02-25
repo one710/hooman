@@ -17,6 +17,10 @@ import { initChatHistory } from "../chats/chat-history.js";
 import { createAuditStore } from "../audit/audit-store.js";
 import { initRedis, closeRedis } from "../data/redis.js";
 import { initKillSwitch, closeKillSwitch } from "../agents/kill-switch.js";
+import {
+  createHoomanRunner,
+  type HoomanRunner,
+} from "../agents/hooman-runner.js";
 import { McpManager } from "../capabilities/mcp/manager.js";
 import {
   publish,
@@ -53,9 +57,19 @@ async function main() {
   const mcpManager = new McpManager(mcpConnectionsStore, {
     connectTimeoutMs: env.MCP_CONNECT_TIMEOUT_MS,
     closeTimeoutMs: env.MCP_CLOSE_TIMEOUT_MS,
-    auditLog,
   });
-  debug("MCP Server Manager enabled");
+  debug("MCP manager enabled");
+
+  let runnerCache: HoomanRunner | null = null;
+  const getRunner = async (): Promise<HoomanRunner> => {
+    if (runnerCache) return runnerCache;
+    const { agentTools } = await mcpManager.tools();
+    runnerCache = await createHoomanRunner({ agentTools, auditLog });
+    return runnerCache;
+  };
+
+  // Start/cache MCP manager tools
+  await mcpManager.tools();
 
   // Handle synchronous MCP reload RPC from the API (Tools tab refresh)
   const mcpReloadSub = createSubscriber();
@@ -65,9 +79,10 @@ async function main() {
       async () => {
         debug("MCP reload RPC received; re-reading config");
         await loadPersisted();
-        await mcpManager.reload();
-        await mcpManager.getSession();
-        debug("MCP Server Manager reloaded via RPC");
+        await mcpManager.shutdown();
+        await mcpManager.tools();
+        runnerCache = null;
+        debug("MCP manager reloaded via RPC");
         return { ok: true };
       },
     );
@@ -80,10 +95,10 @@ async function main() {
     eventRouter,
     context,
     auditLog,
-    publishResponseDelivery: (payload) => {
+    publishResponse: (payload) => {
       publish(RESPONSE_DELIVERY_CHANNEL, JSON.stringify(payload));
     },
-    mcpManager,
+    getRunner,
   });
 
   const eventQueue = createEventQueue({ connection: env.REDIS_URL });
@@ -106,7 +121,7 @@ async function main() {
     if (mcpReloadSub) await mcpReloadSub.close();
     await closeKillSwitch();
     await eventQueue.close();
-    await mcpManager?.reload();
+    await mcpManager?.shutdown();
     await closeRedis();
     process.exit(0);
   };

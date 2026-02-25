@@ -6,7 +6,12 @@ import createDebug from "debug";
 import type { EventRouter } from "./event-router.js";
 import type { ContextStore } from "../agents/context.js";
 import type { AuditLog } from "../audit/audit.js";
-import { McpManager } from "../capabilities/mcp/manager.js";
+import type {
+  HoomanRunner,
+  RunChatOptions,
+  RunChatResult,
+} from "../agents/hooman-runner.js";
+import type { ModelMessage } from "ai";
 import type {
   ChannelMeta,
   ResponseDeliveryPayload,
@@ -33,19 +38,29 @@ export interface EventHandlerDeps {
   context: ContextStore;
   auditLog: AuditLog;
   /** Publishes response to Redis; API/Slack/WhatsApp subscribers deliver accordingly. */
-  publishResponseDelivery: (payload: ResponseDeliveryPayload) => void;
-  /** Long-lived MCP session manager. */
-  mcpManager: McpManager;
+  publishResponse: (payload: ResponseDeliveryPayload) => void;
+  /** Returns the current agent session (generate). */
+  getRunner: () => Promise<HoomanRunner>;
 }
 
 export function registerEventHandlers(deps: EventHandlerDeps): void {
-  const {
-    eventRouter,
-    context,
-    auditLog,
-    publishResponseDelivery,
-    mcpManager,
-  } = deps;
+  const { eventRouter, context, auditLog, publishResponse, getRunner } = deps;
+
+  /** Runs the agent; optional timeout (e.g. for chat). No timeout = run to completion. */
+  async function runAgent(
+    history: ModelMessage[],
+    text: string,
+    runOptions?: RunChatOptions,
+    timeoutMs?: number | null,
+  ): Promise<RunChatResult> {
+    const runner = await getRunner();
+    const runPromise = runner.generate(history, text, runOptions);
+    if (timeoutMs == null || timeoutMs <= 0) return runPromise;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new ChatTimeoutError()), timeoutMs);
+    });
+    return Promise.race([runPromise, timeoutPromise]);
+  }
 
   function dispatchResponseToChannel(
     eventId: string,
@@ -54,8 +69,8 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     assistantText: string,
   ): void | Promise<void> {
     if (assistantText.includes(HOOMAN_SKIP_MARKER)) {
-      if (source === "api" && publishResponseDelivery) {
-        return publishResponseDelivery({
+      if (source === "api" && publishResponse) {
+        return publishResponse({
           channel: "api",
           eventId,
           skipped: true,
@@ -63,14 +78,14 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       }
       return;
     }
-    if (source === "api" && publishResponseDelivery) {
-      return publishResponseDelivery({
+    if (source === "api" && publishResponse) {
+      return publishResponse({
         channel: "api",
         eventId,
         message: { role: "assistant", text: assistantText },
       });
     }
-    if (source === "slack" && publishResponseDelivery) {
+    if (source === "slack" && publishResponse) {
       const meta = channelMeta as SlackChannelMeta | undefined;
       if (meta?.channel === "slack") {
         const payload: ResponseDeliveryPayload = {
@@ -81,13 +96,13 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             ? { threadTs: meta.threadTs }
             : {}),
         };
-        return publishResponseDelivery(payload);
+        return publishResponse(payload);
       }
     }
-    if (source === "whatsapp" && publishResponseDelivery) {
+    if (source === "whatsapp" && publishResponse) {
       const meta = channelMeta as WhatsAppChannelMeta | undefined;
       if (meta?.channel === "whatsapp") {
-        return publishResponseDelivery({
+        return publishResponse({
           channel: "whatsapp",
           chatId: meta.chatId,
           text: assistantText,
@@ -96,7 +111,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     }
   }
 
-  // Chat handler: message.sent → run agents; dispatch response via publishResponseDelivery when set (api → Socket.IO; slack/whatsapp → Redis)
+  // Chat handler: message.sent → run agents; dispatch response via publishResponse when set (api → Socket.IO; slack/whatsapp → Redis)
   eventRouter.register(async (event) => {
     if (event.payload.kind !== "message") return;
     const {
@@ -119,28 +134,24 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         ...(sourceMessageType ? { sourceMessageType } : {}),
       },
     });
+    const chatTimeoutMs =
+      getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
     let assistantText = "";
     try {
       const thread = await context.getThreadForAgent(userId);
-      const session = await mcpManager.getSession();
-      const runPromise = session.generate(thread, text, {
-        channel: channelMeta as ChannelMeta | undefined,
-        attachments: attachmentContents,
-        sessionId: userId,
-      });
-      const chatTimeoutMs =
-        getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new ChatTimeoutError()), chatTimeoutMs);
-      });
-      const { output, messages } = await Promise.race([
-        runPromise,
-        timeoutPromise,
-      ]);
-      const rawOutput =
+      const { output, messages } = await runAgent(
+        thread,
+        text,
+        {
+          channel: channelMeta as ChannelMeta | undefined,
+          attachments: attachmentContents,
+          sessionId: userId,
+        },
+        chatTimeoutMs,
+      );
+      assistantText =
         output?.trim() ||
         "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
-      assistantText = rawOutput;
       auditLog.emitResponse({
         type: "response",
         text: assistantText,
@@ -197,13 +208,15 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             .map(([k, v]) => `${k}=${String(v)}`)
             .join(", ");
     const text = `Scheduled task: ${payload.intent}. Context: ${contextStr}.`;
+    const runOptions: RunChatOptions = {
+      sessionId: payload.context.userId
+        ? String(payload.context.userId)
+        : undefined,
+    };
     try {
-      const session = await mcpManager.getSession();
-      const { output } = await session.generate([], text, {
-        sessionId: payload.context.userId
-          ? String(payload.context.userId)
-          : undefined,
-      });
+      const chatTimeoutMs =
+        getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
+      const { output } = await runAgent([], text, runOptions, chatTimeoutMs);
       const assistantText =
         output?.trim() ||
         "Scheduled task completed (no clear response from agent).";

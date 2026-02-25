@@ -37,6 +37,33 @@ export function getRedis(): Redis | null {
 }
 
 /**
+ * Get a string value by key. Returns null if key is missing or Redis is not initialized.
+ */
+export async function getValue(key: string): Promise<string | null> {
+  const redis = client;
+  if (!redis) return null;
+  return redis.get(key);
+}
+
+/**
+ * Set a string value by key. No-op if Redis is not initialized.
+ */
+export async function writeValue(key: string, value: string): Promise<void> {
+  const redis = client;
+  if (!redis) return;
+  await redis.set(key, value);
+}
+
+/**
+ * Delete a key. No-op if Redis is not initialized.
+ */
+export async function deleteValue(key: string): Promise<void> {
+  const redis = client;
+  if (!redis) return;
+  await redis.del(key);
+}
+
+/**
  * Wait for the shared Redis client to be in "ready" state. Resolves immediately if already ready.
  * Rejects after timeoutMs (default 10s) if the connection doesn't become ready.
  */
