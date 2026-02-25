@@ -123,8 +123,8 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     try {
       const thread = await context.getThreadForAgent(userId);
       const session = await mcpManager.getSession();
-      const runPromise = session.runChat(thread, text, {
-        channelMeta: channelMeta as ChannelMeta | undefined,
+      const runPromise = session.generate(thread, text, {
+        channel: channelMeta as ChannelMeta | undefined,
         attachments: attachmentContents,
         sessionId: userId,
       });
@@ -133,12 +133,12 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new ChatTimeoutError()), chatTimeoutMs);
       });
-      const { finalOutput, turnMessages } = await Promise.race([
+      const { output, messages } = await Promise.race([
         runPromise,
         timeoutPromise,
       ]);
       const rawOutput =
-        finalOutput?.trim() ||
+        output?.trim() ||
         "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
       assistantText = rawOutput;
       auditLog.emitResponse({
@@ -154,8 +154,8 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         channelMeta as ChannelMeta | undefined,
         assistantText,
       );
-      if (turnMessages?.length) {
-        await context.addTurnMessages(userId, turnMessages);
+      if (messages?.length) {
+        await context.addTurnMessages(userId, messages);
         await context.addTurnToChatHistory(
           userId,
           text,
@@ -199,13 +199,13 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
     const text = `Scheduled task: ${payload.intent}. Context: ${contextStr}.`;
     try {
       const session = await mcpManager.getSession();
-      const { finalOutput } = await session.runChat([], text, {
+      const { output } = await session.generate([], text, {
         sessionId: payload.context.userId
           ? String(payload.context.userId)
           : undefined,
       });
       const assistantText =
-        finalOutput?.trim() ||
+        output?.trim() ||
         "Scheduled task completed (no clear response from agent).";
       await auditLog.appendAuditEntry({
         type: "scheduled_task",

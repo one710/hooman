@@ -4,75 +4,24 @@
 import { getHoomanModel } from "./model-provider.js";
 import { ToolLoopAgent, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
+import createDebug from "debug";
 import { createSkillService } from "../capabilities/skills/skills-service.js";
-import type { AuditLogEntry, ChannelMeta, MCPConnection } from "../types.js";
+import type { AuditLogEntry, ChannelMeta } from "../types.js";
 import { getConfig, getFullStaticAgentInstructionsAppend } from "../config.js";
 import { buildChannelContext } from "../channels/shared.js";
+import { buildAgentSystemPrompt } from "../utils/prompts.js";
 import {
-  buildAgentSystemPrompt,
+  buildTurnMessagesFromResult,
   buildUserContentParts,
-} from "../utils/prompts.js";
-import type { MCPConnectionsStore } from "../capabilities/mcp/connections-store.js";
-import {
-  createMcpClients,
-  clientsToTools,
-} from "../capabilities/mcp/mcp-service.js";
+} from "../utils/messages.js";
 import { truncateForMax } from "../utils/helpers.js";
-import createDebug from "debug";
 
 const debug = createDebug("hooman:hooman-runner");
 const DEBUG_TOOL_LOG_MAX = 200; // max chars for args/result in logs
 const AUDIT_TOOL_PAYLOAD_MAX = 100; // max chars for tool args/result in audit log
 
-/** @deprecated Use ModelMessage[] for full AI SDK format. */
-export type AgentInputItem = {
-  role: "user" | "assistant" | "system";
-  content: string;
-};
-
-/** Build AI SDK messages for this turn (user message + assistant tool/text from result) for storage in recollect. */
-function buildTurnMessagesFromResult(
-  newUserMessage: ModelMessage,
-  result: { steps?: unknown[]; text?: string },
-): ModelMessage[] {
-  const out: ModelMessage[] = [newUserMessage];
-  const steps = result.steps ?? [];
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i] as { toolCalls?: unknown[]; toolResults?: unknown[] };
-    const calls = step.toolCalls ?? [];
-    const results = step.toolResults ?? [];
-    if (calls.length > 0) {
-      const toolCalls = calls.map((c, j) => {
-        const x = c as Record<string, unknown>;
-        return {
-          toolCallId: (x.toolCallId as string) ?? `call_${i}_${j}`,
-          toolName: (x.toolName as string) ?? (x.name as string) ?? "unknown",
-          args: (x.args ?? x.input ?? {}) as Record<string, unknown>,
-        };
-      });
-      out.push({ role: "assistant", content: [], toolCalls } as ModelMessage);
-    }
-    if (results.length > 0) {
-      const content = results.map((r, j) => {
-        const x = r as Record<string, unknown>;
-        return {
-          type: "tool-result" as const,
-          toolCallId: (x.toolCallId as string) ?? `call_${i}_${j}`,
-          result: x.result ?? x.output,
-        };
-      });
-      out.push({ role: "tool", content } as unknown as ModelMessage);
-    }
-  }
-  const finalText = (result.text ?? "").trim();
-  if (finalText.length > 0) {
-    out.push({ role: "assistant", content: finalText });
-  }
-  return out;
-}
-
 export interface RunChatOptions {
-  channelMeta?: ChannelMeta;
+  channel?: ChannelMeta;
   sessionId?: string;
   attachments?: Array<{
     name: string;
@@ -82,28 +31,28 @@ export interface RunChatOptions {
 }
 
 export interface RunChatResult {
-  finalOutput: string;
+  output: string;
   /** Full AI SDK messages for this turn (user + assistant with tool calls/results). Store via context.addTurnMessages for recollect. */
-  turnMessages?: ModelMessage[];
+  messages?: ModelMessage[];
 }
 
 export interface DiscoveredTool {
-  name: string;
+  toolName: string;
   description?: string;
-  connectionId: string;
-  connectionName: string;
+  id: string;
+  name: string;
 }
 
-/** MCP clients to close after run. */
 export interface HoomanRunnerSession {
-  runChat(
-    thread: ModelMessage[],
-    newUserMessage: string,
+  generate(
+    history: ModelMessage[],
+    message: string,
     options?: RunChatOptions,
   ): Promise<RunChatResult>;
-  closeMcp: () => Promise<void>;
-  tools: DiscoveredTool[];
 }
+
+/** Session returned by createHoomanRunner; manager composes with tools for HoomanRunnerSession. */
+export type HoomanRunnerCore = Pick<HoomanRunnerSession, "generate">;
 
 export type AuditLogAppender = {
   appendAuditEntry(
@@ -111,76 +60,41 @@ export type AuditLogAppender = {
   ): Promise<void>;
 };
 
-export async function createHoomanRunner(options?: {
-  connections?: MCPConnection[];
-  mcpConnectionsStore?: MCPConnectionsStore;
+export async function createHoomanRunner(options: {
+  agentTools: Record<string, unknown>;
   auditLog?: AuditLogAppender;
   sessionId?: string;
-}): Promise<HoomanRunnerSession> {
+}): Promise<HoomanRunnerCore> {
   const config = getConfig();
   const model = getHoomanModel(config);
 
-  const allConnections: MCPConnection[] = options?.connections ?? [];
+  const { agentTools, auditLog, sessionId } = options;
 
-  const [skillsSection, mcpClients] = await Promise.all([
-    (async () => {
-      const skillService = createSkillService();
-      return skillService.getSkillsMetadataSection();
-    })(),
-    createMcpClients(allConnections, {
-      mcpConnectionsStore: options?.mcpConnectionsStore,
-    }),
-  ]);
-
-  const { prefixedTools, tools } = await clientsToTools(
-    mcpClients,
-    allConnections,
-  );
-
-  const agentTools = { ...prefixedTools };
+  const skillService = createSkillService();
+  const skillsSection = await skillService.getSkillsMetadataSection();
 
   const fullSystem = buildAgentSystemPrompt({
     userInstructions: (config.AGENT_INSTRUCTIONS ?? "").trim(),
     staticAppend: getFullStaticAgentInstructionsAppend(),
     skillsSection,
-    sessionId: options?.sessionId,
+    sessionId,
   });
 
-  async function closeMcp(): Promise<void> {
-    for (const { client, id } of mcpClients) {
-      try {
-        debug("Closing MCP client: %s", id);
-        await client.close();
-      } catch (e) {
-        debug("MCP client %s close error: %o", id, e);
-      }
-    }
-  }
-
   return {
-    tools,
-    async runChat(thread, newUserMessage, runOptions) {
-      const input: ModelMessage[] = [];
-      const channelContext = buildChannelContext(runOptions?.channelMeta);
+    async generate(history, message, options) {
+      const input: ModelMessage[] = [...history];
+      const channelContext = buildChannelContext(options?.channel);
       if (channelContext?.trim()) {
         input.push({
-          role: "user",
-          content: `[Channel context] This message originated from an external channel. Your reply will be delivered there automatically; compose a clear response.\n${channelContext.trim()}\n\n---`,
+          role: "system",
+          content: `### Channel Context\nThe following message originated from an external channel. Details are as below:\n\n${channelContext.trim()}`,
         });
       }
-      input.push(...thread);
-      const lastUserContent = buildUserContentParts(
-        newUserMessage,
-        runOptions?.attachments,
-      );
-      const newUserMsg: ModelMessage = {
+      const prompt: ModelMessage = {
         role: "user",
-        content:
-          lastUserContent.length === 1 && lastUserContent[0].type === "text"
-            ? lastUserContent[0].text
-            : lastUserContent,
+        content: buildUserContentParts(message, options?.attachments),
       };
-      input.push(newUserMsg);
+      input.push(prompt);
 
       const maxSteps = getConfig().MAX_TURNS ?? 999;
       const agent = new ToolLoopAgent({
@@ -201,8 +115,8 @@ export async function createHoomanRunner(options?: {
             name,
             truncateForMax(input, DEBUG_TOOL_LOG_MAX),
           );
-          if (options?.auditLog) {
-            void options.auditLog.appendAuditEntry({
+          if (auditLog) {
+            void auditLog.appendAuditEntry({
               type: "tool_call_start",
               payload: {
                 toolName: name,
@@ -220,8 +134,8 @@ export async function createHoomanRunner(options?: {
             name,
             truncateForMax(result, DEBUG_TOOL_LOG_MAX),
           );
-          if (options?.auditLog) {
-            void options.auditLog.appendAuditEntry({
+          if (auditLog) {
+            void auditLog.appendAuditEntry({
               type: "tool_call_end",
               payload: {
                 toolName: name,
@@ -250,8 +164,8 @@ export async function createHoomanRunner(options?: {
             totalToolCalls,
             finishReason,
           );
-          if (options?.auditLog) {
-            void options.auditLog.appendAuditEntry({
+          if (auditLog) {
+            void auditLog.appendAuditEntry({
               type: "run_summary",
               payload: {
                 stepCount,
@@ -262,18 +176,16 @@ export async function createHoomanRunner(options?: {
           }
         },
       });
-      const result = await agent.generate({ messages: input });
 
-      const turnMessages = buildTurnMessagesFromResult(newUserMsg, result);
-
+      const response = await agent.generate({ messages: input });
+      const messages = buildTurnMessagesFromResult(prompt, response);
       const text =
-        result.text ?? (typeof result.finishReason === "string" ? "" : "");
+        response.text ?? (typeof response.finishReason === "string" ? "" : "");
 
       return {
-        finalOutput: text,
-        turnMessages,
+        output: text,
+        messages,
       };
     },
-    closeMcp,
   };
 }

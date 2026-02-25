@@ -121,10 +121,10 @@ const DEFAULT_MAX_TOOL_NAME_LEN = 64;
 const DEFAULT_SHORT_CONN_ID_LEN = 8;
 
 export type McpDiscoveredTool = {
-  name: string;
+  toolName: string;
   description?: string;
-  connectionId: string;
-  connectionName: string;
+  id: string;
+  name: string;
 };
 
 export interface ClientsToToolsResult {
@@ -172,10 +172,10 @@ export async function clientsToTools(
         const prefixed = `${shortId}_${safeName}`;
         prefixedTools[prefixed] = t;
         tools.push({
-          name,
+          toolName: name,
           description: (t as { description?: string }).description,
-          connectionId: id,
-          connectionName: connName,
+          id,
+          name: connName,
         });
       }
     } catch (err) {

@@ -8,8 +8,14 @@ import type { MCPConnectionsStore } from "./connections-store.js";
 import {
   createHoomanRunner,
   type AuditLogAppender,
+  type DiscoveredTool,
   type HoomanRunnerSession,
 } from "../../agents/hooman-runner.js";
+import {
+  type McpClientEntry,
+  createMcpClients,
+  clientsToTools,
+} from "./mcp-service.js";
 import { getAllDefaultMcpConnections } from "./system-mcps.js";
 import { getRedis } from "../../data/redis.js";
 
@@ -77,14 +83,18 @@ async function runWithTimeoutTask(
   }
 }
 
+/** Session with tools; manager attaches tools to runner session. */
+export type McpSession = HoomanRunnerSession & { tools: DiscoveredTool[] };
+
 /**
- * Manages a single cached HoomanRunnerSession. getSession() returns a wrapper
- * with no-op closeMcp so handlers do not tear down shared MCPs. reload() closes
- * the cached session and clears cache so the next getSession() rebuilds.
+ * Manages a single cached session. Creates and owns MCP clients;
+ * reload() closes them and clears cache so the next getSession() rebuilds.
  */
 export class McpManager {
-  private cachedSession: HoomanRunnerSession | null = null;
-  private inFlight: Promise<HoomanRunnerSession> | null = null;
+  private cachedSession: McpSession | null = null;
+  private cachedMcpClients: McpClientEntry[] | null = null;
+  private cachedTools: DiscoveredTool[] = [];
+  private inFlight: Promise<McpSession> | null = null;
   private readonly connectTimeoutMs: number | null;
   private readonly closeTimeoutMs: number | null;
   private readonly auditLog?: AuditLogAppender;
@@ -108,7 +118,7 @@ export class McpManager {
    * Returns a session backed by the cached runner. Handlers must not call closeMcp
    * on the returned session. If no cache exists, builds one (serialized via inFlight).
    */
-  async getSession(): Promise<HoomanRunnerSession> {
+  async getSession(): Promise<McpSession> {
     if (this.cachedSession) {
       return this.wrapSession(this.cachedSession);
     }
@@ -119,7 +129,7 @@ export class McpManager {
       }
       return this.getSession();
     }
-    const build = async (): Promise<HoomanRunnerSession> => {
+    const build = async (): Promise<McpSession> => {
       debug("Building MCP session (first use or after reload)");
       const userConnections = await this.mcpConnectionsStore.getAll();
       const connections = [
@@ -130,13 +140,21 @@ export class McpManager {
         "Building MCP session: requested connections: %j",
         connections.map((c) => c.id),
       );
-      const runner = await createHoomanRunner({
-        connections,
+      const mcpClients = await createMcpClients(connections, {
         mcpConnectionsStore: this.mcpConnectionsStore,
+      });
+      const { prefixedTools, tools } = await clientsToTools(
+        mcpClients,
+        connections,
+      );
+      const runner = await createHoomanRunner({
+        agentTools: { ...prefixedTools },
         auditLog: this.auditLog,
       });
+      this.cachedMcpClients = mcpClients;
+      this.cachedTools = tools;
       debug("Building MCP session done: %s", runner ? "Success" : "Failed");
-      return runner;
+      return this.wrapSession({ generate: runner.generate });
     };
     const connectError = new Error(
       "MCP session build timed out (connectTimeoutMs).",
@@ -147,8 +165,8 @@ export class McpManager {
       const session = await this.inFlight;
       this.cachedSession = session;
       this.inFlight = null;
-      this.publishToolsToRedis(session);
-      return this.wrapSession(session);
+      this.publishToolsToRedis();
+      return session;
     } catch (err) {
       this.inFlight = null;
       throw err;
@@ -156,43 +174,52 @@ export class McpManager {
   }
 
   /**
-   * Closes the cached session (with close timeout) and clears cache.
+   * Closes the cached MCP clients and clears cache.
    * Next getSession() will build a new session from current connections.
    */
   async reload(): Promise<void> {
-    const session = this.cachedSession;
+    const clients = this.cachedMcpClients;
     this.cachedSession = null;
-    if (!session) {
-      debug("MCP manager reload: no cached session to reload");
+    this.cachedMcpClients = null;
+    this.cachedTools = [];
+    if (!clients?.length) {
+      debug("MCP manager reload: no cached clients to close");
+      this.clearToolsFromRedis();
       return;
     }
-    debug("MCP manager reload: closing existing session");
+    debug("MCP manager reload: closing %d MCP client(s)", clients.length);
     const closeError = new Error(
       "MCP session close timed out (closeTimeoutMs).",
     );
     closeError.name = "TimeoutError";
+    const closeAll = async (): Promise<void> => {
+      for (const { client, id } of clients) {
+        try {
+          debug("Closing MCP client: %s", id);
+          await client.close();
+        } catch (e) {
+          debug("MCP client %s close error: %o", id, e);
+        }
+      }
+    };
     try {
-      await runWithTimeoutTask(
-        session.closeMcp(),
-        this.closeTimeoutMs,
-        closeError,
-      );
-      debug("MCP manager reload: session closed");
+      await runWithTimeoutTask(closeAll(), this.closeTimeoutMs, closeError);
+      debug("MCP manager reload: clients closed");
     } catch (err) {
       debug("MCP manager reload close error: %o", err);
     }
     this.clearToolsFromRedis();
   }
 
-  private publishToolsToRedis(session: HoomanRunnerSession): void {
+  private publishToolsToRedis(): void {
     try {
       const redis = getRedis();
       if (!redis) return;
-      const json = JSON.stringify(session.tools);
+      const json = JSON.stringify(this.cachedTools);
       redis.set(DISCOVERED_TOOLS_KEY, json).catch((err) => {
         debug("Failed to publish discovered tools to Redis: %o", err);
       });
-      debug("Published %d discovered tools to Redis", session.tools.length);
+      debug("Published %d discovered tools to Redis", this.cachedTools.length);
     } catch (err) {
       debug("Failed to publish tools to Redis: %o", err);
     }
@@ -210,13 +237,10 @@ export class McpManager {
     }
   }
 
-  private wrapSession(session: HoomanRunnerSession): HoomanRunnerSession {
+  private wrapSession(core: Pick<HoomanRunnerSession, "generate">): McpSession {
     return {
-      runChat: session.runChat.bind(session),
-      closeMcp: async () => {
-        /* no-op when using manager; do not tear down shared MCPs */
-      },
-      tools: session.tools,
+      generate: core.generate,
+      tools: this.cachedTools,
     };
   }
 }
