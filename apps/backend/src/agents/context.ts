@@ -85,9 +85,7 @@ export function createContext(chatHistory: ChatHistoryStore): ContextStore {
     async getThreadForAgent(userId: string): Promise<ModelMessage[]> {
       const messages = await memory.getMessages(userId);
       return messages.map((msg) =>
-        msg.role === "system"
-          ? ({ ...msg, role: "user" as const })
-          : msg,
+        msg.role === "system" ? { ...msg, role: "user" as const } : msg,
       );
     },
 

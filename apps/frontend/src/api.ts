@@ -244,6 +244,7 @@ export async function getHealth(): Promise<{
 }
 
 export interface DiscoveredTool {
+  id: string;
   name: string;
   description?: string;
   connectionId: string;

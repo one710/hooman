@@ -145,7 +145,7 @@ export function Tools() {
                 <div className="divide-y divide-hooman-border/50">
                   {group.tools.map((tool) => (
                     <div
-                      key={`${group.connectionId}-${tool.name}`}
+                      key={tool.id}
                       className="px-4 py-3 hover:bg-hooman-border/20 transition-colors"
                     >
                       <div className="flex items-center gap-2">

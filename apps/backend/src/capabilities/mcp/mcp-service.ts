@@ -120,11 +120,13 @@ export async function createMcpClients(
 const DEFAULT_MAX_TOOL_NAME_LEN = 64;
 const DEFAULT_SHORT_CONN_ID_LEN = 8;
 
+/** Shape for UI: tool name + connection info. name = actual tool name (e.g. read_file), not connection name. */
 export type McpDiscoveredTool = {
-  toolName: string;
-  description?: string;
   id: string;
   name: string;
+  description?: string;
+  connectionId: string;
+  connectionName: string;
 };
 
 export interface ClientsToToolsResult {
@@ -172,10 +174,11 @@ export async function clientsToTools(
         const prefixed = `${shortId}_${safeName}`;
         prefixedTools[prefixed] = t;
         tools.push({
-          toolName: name,
+          id: `${id}/${name}`,
+          name,
           description: (t as { description?: string }).description,
-          id,
-          name: connName,
+          connectionId: id,
+          connectionName: connName,
         });
       }
     } catch (err) {

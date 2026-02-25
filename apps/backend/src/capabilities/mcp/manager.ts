@@ -17,11 +17,13 @@ const debug = createDebug("hooman:mcp-manager");
 
 export const DISCOVERED_TOOLS_KEY = "hooman:discovered-tools";
 
+/** Matches frontend: name = tool name, connectionId/connectionName for grouping. */
 export interface DiscoveredTool {
-  toolName: string;
-  description?: string;
   id: string;
   name: string;
+  description?: string;
+  connectionId: string;
+  connectionName: string;
 }
 
 /** Fallback when options not passed (e.g. tests). Production uses env via config. */
