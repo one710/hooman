@@ -137,6 +137,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         ...(sourceMessageType ? { sourceMessageType } : {}),
       },
     });
+    debug("Processing message eventId=%s userId=%s", event.id, userId);
     const chatTimeoutMs =
       getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
     let assistantText = "";
@@ -162,6 +163,11 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         userInput: text,
       });
       // Notify frontend/channels immediately so the user sees the reply without waiting for persistence
+      debug(
+        "Dispatching response eventId=%s len=%d",
+        event.id,
+        assistantText.length,
+      );
       await dispatchResponseToChannel(
         event.id,
         event.source,
@@ -189,10 +195,11 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       } else {
         const msg = (err as Error).message;
         assistantText = `Something went wrong: ${msg}. Check API logs.`;
-        debug("Chat handler error: %o", err);
+        debug("Chat handler error eventId=%s: %o", event.id, err);
       }
 
       await context.addTurn(userId, text, assistantText, attachments);
+      debug("Dispatching error response eventId=%s", event.id);
       await dispatchResponseToChannel(
         event.id,
         event.source,
