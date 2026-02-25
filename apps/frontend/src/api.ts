@@ -1,4 +1,5 @@
 import { clearToken, getToken } from "./auth";
+import type { AuditEntry, MCPConnection } from "./types";
 
 /** API base URL. Set VITE_API_BASE when building, or defaults to http://localhost:3000. */
 const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:3000";
@@ -163,7 +164,7 @@ export async function sendMessage(
 }
 
 export async function getAudit(): Promise<{
-  entries: import("./types").AuditEntry[];
+  entries: AuditEntry[];
 }> {
   const res = await authFetch(`${BASE}/api/audit`);
   if (!res.ok) throw new Error(await res.text());
@@ -173,15 +174,6 @@ export async function getAudit(): Promise<{
 export async function getKillSwitch(): Promise<{ enabled: boolean }> {
   const res = await authFetch(`${BASE}/api/safety/kill-switch`);
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-/** Available capabilities from configured MCP connections. */
-export async function getCapabilitiesAvailable(): Promise<{
-  capabilities: { integrationId: string; capability: string }[];
-}> {
-  const res = await authFetch(`${BASE}/api/capabilities/mcp/available`);
-  if (!res.ok) return { capabilities: [] };
   return res.json();
 }
 
@@ -248,6 +240,31 @@ export async function getHealth(): Promise<{
 }> {
   const res = await fetch(`${BASE}/health`);
   if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export interface DiscoveredTool {
+  name: string;
+  description?: string;
+  connectionId: string;
+  connectionName: string;
+}
+
+export async function getDiscoveredTools(): Promise<{
+  tools: DiscoveredTool[];
+}> {
+  const res = await authFetch(`${BASE}/api/capabilities/mcp/tools`);
+  if (!res.ok) return { tools: [] };
+  return res.json();
+}
+
+export async function reloadMcpTools(): Promise<{
+  tools: DiscoveredTool[];
+}> {
+  const res = await authFetch(`${BASE}/api/capabilities/mcp/reload`, {
+    method: "POST",
+  });
+  if (!res.ok) return { tools: [] };
   return res.json();
 }
 
@@ -380,7 +397,7 @@ export async function cancelScheduledTask(id: string): Promise<void> {
 
 // MCP connections (Hosted, Streamable HTTP, Stdio)
 export async function getMCPConnections(): Promise<{
-  connections: import("./types").MCPConnection[];
+  connections: MCPConnection[];
 }> {
   const res = await authFetch(`${BASE}/api/capabilities/mcp/connections`);
   if (!res.ok) throw new Error(await res.text());
@@ -388,8 +405,8 @@ export async function getMCPConnections(): Promise<{
 }
 
 export async function createMCPConnection(
-  connection: import("./types").MCPConnection,
-): Promise<{ connection: import("./types").MCPConnection }> {
+  connection: MCPConnection,
+): Promise<{ connection: MCPConnection }> {
   const res = await authFetch(`${BASE}/api/capabilities/mcp/connections`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -401,8 +418,8 @@ export async function createMCPConnection(
 
 export async function updateMCPConnection(
   id: string,
-  patch: Partial<import("./types").MCPConnection>,
-): Promise<{ connection: import("./types").MCPConnection }> {
+  patch: Partial<MCPConnection>,
+): Promise<{ connection: MCPConnection }> {
   const res = await authFetch(
     `${BASE}/api/capabilities/mcp/connections/${id}`,
     {

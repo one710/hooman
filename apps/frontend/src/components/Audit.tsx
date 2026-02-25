@@ -4,6 +4,7 @@ import type { AuditEntry } from "../types";
 import { getAudit } from "../api";
 import { getSocket } from "../socket";
 import { Button } from "./Button";
+import { PageHeader } from "./PageHeader";
 
 export function Audit() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -30,15 +31,7 @@ export function Audit() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
-        <div className="min-w-0">
-          <h2 className="text-base md:text-lg font-semibold text-white">
-            Audit log
-          </h2>
-          <p className="text-xs md:text-sm text-hooman-muted">
-            See what Hooman did and why.
-          </p>
-        </div>
+      <PageHeader title="Audit log" subtitle="See what Hooman did and why.">
         <Button
           onClick={load}
           variant="secondary"
@@ -49,7 +42,7 @@ export function Audit() {
         >
           Refresh
         </Button>
-      </header>
+      </PageHeader>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
         {error && (
           <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 text-sm">

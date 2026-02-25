@@ -12,10 +12,8 @@ import {
   type MCPConnectionStdio,
 } from "../../types.js";
 import { env } from "../../env.js";
-import { setReloadFlag } from "../../utils/reload-flag.js";
 
 export interface McpService {
-  listAvailable(): Promise<{ integrationId: string; capability: string }[]>;
   getAllConnections(): Promise<MCPConnection[]>;
   getConnectionById(id: string): Promise<MCPConnection | null>;
   addConnection(
@@ -38,17 +36,6 @@ export interface McpService {
 
 export function createMcpService(store: MCPConnectionsStore): McpService {
   return {
-    async listAvailable() {
-      const connections = await store.getAll();
-      return connections.map((c) => ({
-        integrationId: c.id,
-        capability:
-          c.type === "hosted"
-            ? c.server_label || c.id
-            : (c as { name?: string }).name || c.id,
-      }));
-    },
-
     async getAllConnections() {
       return store.getAll();
     },
@@ -126,7 +113,6 @@ export function createMcpService(store: MCPConnectionsStore): McpService {
       }
 
       await store.addOrUpdate(conn);
-      if (env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       return conn;
     },
 
@@ -178,13 +164,11 @@ export function createMcpService(store: MCPConnectionsStore): McpService {
       }
 
       await store.addOrUpdate(merged);
-      if (env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       return merged;
     },
 
     async removeConnection(id) {
       const ok = await store.remove(id);
-      if (ok && env.REDIS_URL) await setReloadFlag(env.REDIS_URL, "mcp");
       return ok;
     },
 

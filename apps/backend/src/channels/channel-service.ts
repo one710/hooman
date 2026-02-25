@@ -2,7 +2,6 @@ import { getChannelsConfig, updateChannelsConfig } from "../config.js";
 import { setReloadFlags, type ReloadScope } from "../utils/reload-flag.js";
 import { getRedis } from "../data/redis.js";
 import { requestResponse } from "../utils/pubsub.js";
-import { env } from "../env.js";
 import type { ChannelsConfig } from "../types.js";
 import type { WhatsAppConnection } from "./whatsapp-adapter.js";
 import { mask, isMasked } from "../utils/helpers.js";
@@ -101,8 +100,8 @@ export function createChannelService(): ChannelService {
       if (body.slack !== undefined) channelScopes.push("slack");
       if (body.whatsapp !== undefined) channelScopes.push("whatsapp");
 
-      if (channelScopes.length && env.REDIS_URL) {
-        await setReloadFlags(env.REDIS_URL, channelScopes);
+      if (channelScopes.length) {
+        await setReloadFlags(channelScopes);
       }
     },
 

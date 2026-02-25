@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import createDebug from "debug";
 import { getKillSwitch, setKillSwitch } from "../api";
+import { PageHeader } from "./PageHeader";
 
 const debug = createDebug("hooman:Safety");
 
@@ -27,14 +28,10 @@ export function Safety() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold text-white">
-          Safety & control
-        </h2>
-        <p className="text-xs md:text-sm text-hooman-muted">
-          Pause Hooman or control what it’s allowed to do.
-        </p>
-      </header>
+      <PageHeader
+        title="Safety & control"
+        subtitle="Pause Hooman or control what it’s allowed to do."
+      />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0">
         <div className="rounded-xl border border-hooman-border bg-hooman-surface p-4">
           <h3 className="font-medium text-white mb-2">Global kill switch</h3>

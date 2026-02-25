@@ -85,6 +85,7 @@ import { useDialog } from "./Dialog";
 import { Modal } from "./Modal";
 import { SlackConfigForm } from "./SlackConfigForm";
 import { WhatsAppConfigForm } from "./WhatsAppConfigForm";
+import { PageHeader } from "./PageHeader";
 
 export function Channels() {
   const dialog = useDialog();
@@ -172,14 +173,10 @@ export function Channels() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold text-white">
-          Channels
-        </h2>
-        <p className="text-xs md:text-sm text-hooman-muted">
-          Manage where Hooman receives messages (web, Slack, WhatsApp).
-        </p>
-      </header>
+      <PageHeader
+        title="Channels"
+        subtitle="Manage where Hooman receives messages (web, Slack, WhatsApp)."
+      />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
         {list.map((ch) => (
           <ChannelCard

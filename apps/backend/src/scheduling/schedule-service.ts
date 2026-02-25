@@ -4,7 +4,6 @@ import type { ScheduledTask } from "../types.js";
 import type { ScheduleStore } from "./schedule-store.js";
 
 import { setReloadFlag } from "../utils/reload-flag.js";
-import { env } from "../env.js";
 
 function validateCron(cron: string): boolean {
   try {
@@ -36,7 +35,7 @@ export function createScheduleService(store: ScheduleStore): ScheduleService {
       }
       const id = randomUUID();
       await store.add({ ...task, id });
-      await setReloadFlag(env.REDIS_URL, "schedule");
+      await setReloadFlag("schedule");
       return id;
     },
 
@@ -49,7 +48,7 @@ export function createScheduleService(store: ScheduleStore): ScheduleService {
       }
       const ok = await store.update(id, task);
       if (ok) {
-        await setReloadFlag(env.REDIS_URL, "schedule");
+        await setReloadFlag("schedule");
       }
       return ok;
     },
@@ -57,7 +56,7 @@ export function createScheduleService(store: ScheduleStore): ScheduleService {
     async cancel(id: string): Promise<boolean> {
       const ok = await store.remove(id);
       if (ok) {
-        await setReloadFlag(env.REDIS_URL, "schedule");
+        await setReloadFlag("schedule");
       }
 
       return ok;

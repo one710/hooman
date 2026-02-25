@@ -9,10 +9,11 @@ import type {
   SlackChannelMeta,
   SlackChannelConfig,
 } from "../types.js";
+import { App } from "@slack/bolt";
 
 const debug = createDebug("hooman:slack-adapter");
 
-let slackApp: import("@slack/bolt").App | null = null;
+let slackApp: App | null = null;
 
 import { applyFilter } from "./shared.js";
 
@@ -39,8 +40,6 @@ export async function startSlackAdapter(
     debug("Slack adapter not started: disabled or missing appToken/userToken");
     return;
   }
-
-  const { App } = await import("@slack/bolt");
   const app = new App({
     appToken: config.appToken.trim(),
     token: config.userToken.trim(),

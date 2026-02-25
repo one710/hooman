@@ -8,6 +8,7 @@ const debug = createDebug("hooman:api");
 import { AuditLog } from "./audit/audit.js";
 import type { ResponsePayload } from "./audit/audit.js";
 import { getConfig, loadPersisted } from "./config.js";
+import type { RawDispatchInput } from "./types.js";
 import { registerRoutes } from "./routes/index.js";
 import { localhostOnly } from "./middleware/localhost-only.js";
 import { authJwt, verifyToken } from "./middleware/auth-jwt.js";
@@ -18,6 +19,7 @@ import { createChatService } from "./chats/chat-service.js";
 import { createAttachmentService } from "./attachments/attachment-service.js";
 import { createContext } from "./agents/context.js";
 import { initScheduleStore } from "./scheduling/schedule-store.js";
+import { createScheduleService } from "./scheduling/schedule-service.js";
 import { initMCPConnectionsStore } from "./capabilities/mcp/connections-store.js";
 import { createAuditStore } from "./audit/audit-store.js";
 import { createSkillService } from "./capabilities/skills/skills-service.js";
@@ -54,7 +56,7 @@ async function main() {
   const eventQueue = createEventQueue({ connection: redisUrl });
   const dedupSet = new Set<string>();
   const enqueue = (
-    raw: import("./types.js").RawDispatchInput,
+    raw: RawDispatchInput,
     options?: { correlationId?: string },
   ) =>
     enqueueRaw(eventQueue, raw, {
@@ -83,8 +85,6 @@ async function main() {
   const auditStore = createAuditStore();
   const auditLog = new AuditLog(auditStore);
 
-  const { createScheduleService } =
-    await import("./scheduling/schedule-service.js");
   const scheduler = createScheduleService(scheduleStore);
 
   const responseStore: Map<

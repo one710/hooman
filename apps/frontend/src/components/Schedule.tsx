@@ -12,6 +12,7 @@ import { Input } from "./Input";
 import { DateTimePicker } from "./DateTimePicker";
 import { Modal } from "./Modal";
 import { Radio } from "./Radio";
+import { PageHeader } from "./PageHeader";
 
 interface Task {
   id: string;
@@ -143,15 +144,10 @@ export function Schedule() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
-        <div className="min-w-0">
-          <h2 className="text-base md:text-lg font-semibold text-white">
-            Schedule
-          </h2>
-          <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Set tasks for later—Hooman will run them when the time comes.
-          </p>
-        </div>
+      <PageHeader
+        title="Schedule"
+        subtitle="Set tasks for later—Hooman will run them when the time comes."
+      >
         <Button
           onClick={openAdd}
           className="self-start sm:self-auto"
@@ -159,7 +155,7 @@ export function Schedule() {
         >
           Add task
         </Button>
-      </header>
+      </PageHeader>
       <Modal
         open={modalOpen}
         onClose={closeModal}

@@ -144,6 +144,13 @@ function buildUserContentParts(
   return parts;
 }
 
+export interface DiscoveredTool {
+  name: string;
+  description?: string;
+  connectionId: string;
+  connectionName: string;
+}
+
 /** MCP clients to close after run. */
 export interface HoomanRunnerSession {
   runChat(
@@ -152,6 +159,7 @@ export interface HoomanRunnerSession {
     options?: RunChatOptions,
   ): Promise<RunChatResult>;
   closeMcp: () => Promise<void>;
+  discoveredTools: DiscoveredTool[];
 }
 
 export type AuditLogAppender = {
@@ -274,11 +282,13 @@ export async function createHoomanRunner(options?: {
   const MAX_TOOL_NAME_LEN = 64;
   const SHORT_CONN_ID_LEN = 8;
   const mcpTools: Record<string, unknown> = {};
+  const discoveredTools: DiscoveredTool[] = [];
   for (const { client, id } of mcpClients) {
     try {
       const toolSet = await client.tools();
       const toolNames = Object.keys(toolSet);
       const conn = allConnections.find((c) => c.id === id);
+      const connName = (conn as { name?: string })?.name || conn?.id || id;
       const filtered = filterToolNames(toolNames, conn?.tool_filter);
       debug(
         "MCP client %s tool discovery: %d tools found, %d after filter (%j)",
@@ -296,6 +306,12 @@ export async function createHoomanRunner(options?: {
           name.length <= maxNameLen ? name : name.slice(0, maxNameLen);
         const prefixed = `${shortId}_${safeName}`;
         mcpTools[prefixed] = t;
+        discoveredTools.push({
+          name,
+          description: (t as { description?: string }).description,
+          connectionId: id,
+          connectionName: connName,
+        });
       }
     } catch (err) {
       debug("MCP client %s tools() failed: %o", id, err);
@@ -331,6 +347,7 @@ export async function createHoomanRunner(options?: {
   }
 
   return {
+    discoveredTools,
     async runChat(thread, newUserMessage, runOptions) {
       const input: ModelMessage[] = [];
       if (runOptions?.channelContext?.trim()) {

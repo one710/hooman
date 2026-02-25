@@ -15,11 +15,14 @@ import { initMCPConnectionsStore } from "../capabilities/mcp/connections-store.j
 import { initDb } from "../data/db.js";
 import { initChatHistory } from "../chats/chat-history.js";
 import { createAuditStore } from "../audit/audit-store.js";
-import { publish } from "../utils/pubsub.js";
 import { initRedis, closeRedis } from "../data/redis.js";
 import { initKillSwitch, closeKillSwitch } from "../agents/kill-switch.js";
 import { McpManager } from "../capabilities/mcp/manager.js";
-import { initReloadWatch, closeReloadWatch } from "../utils/reload-flag.js";
+import {
+  publish,
+  createSubscriber,
+  createRpcMessageHandler,
+} from "../utils/pubsub.js";
 import { env } from "../env.js";
 import { RESPONSE_DELIVERY_CHANNEL } from "../types.js";
 import { loadPrompts } from "../utils/prompts.js";
@@ -54,12 +57,23 @@ async function main() {
   });
   debug("MCP Server Manager enabled");
 
-  initReloadWatch(env.REDIS_URL, ["mcp"], async () => {
-    debug("MCP reload triggered; re-reading config");
-    await loadPersisted();
-    await mcpManager.reload();
-    debug("MCP Server Manager reloaded");
-  });
+  // Handle synchronous MCP reload RPC from the API (Tools tab refresh)
+  const mcpReloadSub = createSubscriber();
+  if (mcpReloadSub) {
+    const handler = createRpcMessageHandler(
+      "hooman:mcp-reload:response",
+      async () => {
+        debug("MCP reload RPC received; re-reading config");
+        await loadPersisted();
+        await mcpManager.reload();
+        await mcpManager.getSession();
+        debug("MCP Server Manager reloaded via RPC");
+        return { ok: true };
+      },
+    );
+    mcpReloadSub.subscribe("hooman:mcp-reload:request", handler);
+    debug("Subscribed to hooman:mcp-reload:request for MCP reload RPC");
+  }
 
   const eventRouter = new EventRouter();
   registerEventHandlers({
@@ -88,8 +102,8 @@ async function main() {
   );
 
   const shutdown = async () => {
-    debug("Shutting down event-queue worker…");
-    await closeReloadWatch();
+    debug("Shutting down event-queue worker\u2026");
+    if (mcpReloadSub) await mcpReloadSub.close();
     await closeKillSwitch();
     await eventQueue.close();
     await mcpManager?.reload();

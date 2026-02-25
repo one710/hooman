@@ -11,8 +11,11 @@ import {
   type HoomanRunnerSession,
 } from "../../agents/hooman-runner.js";
 import { getAllDefaultMcpConnections } from "./system-mcps.js";
+import { getRedis } from "../../data/redis.js";
 
 const debug = createDebug("hooman:mcp-manager");
+
+export const DISCOVERED_TOOLS_KEY = "hooman:discovered-tools";
 
 /** Fallback when options not passed (e.g. tests). Production uses env via config. */
 const DEFAULT_CONNECT_TIMEOUT_MS = 300_000;
@@ -144,6 +147,7 @@ export class McpManager {
       const session = await this.inFlight;
       this.cachedSession = session;
       this.inFlight = null;
+      this.publishToolsToRedis(session);
       return this.wrapSession(session);
     } catch (err) {
       this.inFlight = null;
@@ -177,6 +181,36 @@ export class McpManager {
     } catch (err) {
       debug("MCP manager reload close error: %o", err);
     }
+    this.clearToolsFromRedis();
+  }
+
+  private publishToolsToRedis(session: HoomanRunnerSession): void {
+    try {
+      const redis = getRedis();
+      if (!redis) return;
+      const json = JSON.stringify(session.discoveredTools);
+      redis.set(DISCOVERED_TOOLS_KEY, json).catch((err) => {
+        debug("Failed to publish discovered tools to Redis: %o", err);
+      });
+      debug(
+        "Published %d discovered tools to Redis",
+        session.discoveredTools.length,
+      );
+    } catch (err) {
+      debug("Failed to publish tools to Redis: %o", err);
+    }
+  }
+
+  private clearToolsFromRedis(): void {
+    try {
+      const redis = getRedis();
+      if (!redis) return;
+      redis.del(DISCOVERED_TOOLS_KEY).catch((err) => {
+        debug("Failed to clear discovered tools from Redis: %o", err);
+      });
+    } catch (err) {
+      debug("Failed to clear tools from Redis: %o", err);
+    }
   }
 
   private wrapSession(session: HoomanRunnerSession): HoomanRunnerSession {
@@ -185,6 +219,7 @@ export class McpManager {
       closeMcp: async () => {
         /* no-op when using manager; do not tear down shared MCPs */
       },
+      discoveredTools: session.discoveredTools,
     };
   }
 }

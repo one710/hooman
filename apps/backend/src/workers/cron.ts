@@ -135,7 +135,7 @@ async function main() {
     await scheduler.reload();
   }
 
-  initReloadWatch(env.REDIS_URL, ["schedule"], onReload);
+  initReloadWatch(["schedule"], onReload);
   debug(
     "Cron worker started; enqueuing to BullMQ; scheduled tasks; watching Redis reload flag",
   );

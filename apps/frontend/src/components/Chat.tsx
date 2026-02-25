@@ -13,6 +13,7 @@ import { useDialog } from "./Dialog";
 import { Button } from "./Button";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput, type QueuedMessage } from "./ChatInput";
+import { PageHeader } from "./PageHeader";
 
 const debug = createDebug("hooman:Chat");
 const CHAT_PAGE_SIZE = 50;
@@ -179,15 +180,10 @@ export function Chat() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex justify-between items-center gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base md:text-lg font-semibold text-white truncate">
-            Chat with Hooman
-          </h2>
-          <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Have a conversation with Hooman and get things done.
-          </p>
-        </div>
+      <PageHeader
+        title="Chat with Hooman"
+        subtitle="Have a conversation with Hooman and get things done."
+      >
         <Button
           variant="danger"
           size="sm"
@@ -200,7 +196,7 @@ export function Chat() {
             {clearing ? "Clearing…" : "Clear chat"}
           </span>
         </Button>
-      </header>
+      </PageHeader>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
         {chatTotal > messages.length && (
           <div className="flex justify-center">

@@ -1,94 +1,73 @@
 /**
- * Redis-backed reload flags per scope so the API can signal only the affected workers.
- * Scopes: schedule (cron tasks), slack, whatsapp, mcp (MCP connections).
- * Uses shared client from data/redis; call initRedis(redisUrl) first.
+ * Redis-backed reload notifications per scope using pub/sub (no polling timers).
+ * Scopes: schedule, slack, whatsapp, mcp.
+ * Publishers call setReloadFlag/setReloadFlags → publishes to hooman:reload:<scope>.
+ * Subscribers call initReloadWatch → subscribes to the relevant channels.
+ * Call initRedis() before using.
  */
-import { initRedis, getRedis } from "../data/redis.js";
+import { getRedis } from "../data/redis.js";
+import { createSubscriber, type Subscriber } from "./pubsub.js";
 
 export type ReloadScope = "schedule" | "slack" | "whatsapp" | "mcp";
 
-const REDIS_KEY_PREFIX = "hooman:workers:reload:";
-const POLL_MS = 2000;
+const CHANNEL_PREFIX = "hooman:reload:";
 
-function key(scope: ReloadScope): string {
-  return REDIS_KEY_PREFIX + scope;
+function channel(scope: ReloadScope): string {
+  return CHANNEL_PREFIX + scope;
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let subscriber: Subscriber | null = null;
 
 /**
- * Set the reload flag for a scope. Call from API after schedule add/cancel or when a channel's config is updated.
+ * Publish a reload notification for a scope. No-op if Redis is not initialized.
  */
-export async function setReloadFlag(
-  redisUrl: string,
-  scope: ReloadScope,
-): Promise<void> {
-  const url = redisUrl?.trim();
-  if (!url) return;
-  initRedis(redisUrl);
+export async function setReloadFlag(scope: ReloadScope): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
-  await redis.set(key(scope), "1");
+  await redis.publish(channel(scope), "reload");
 }
 
 /**
- * Set reload flags for multiple scopes (e.g. when multiple channels are updated in one PATCH).
+ * Publish reload notifications for multiple scopes.
  */
-export async function setReloadFlags(
-  redisUrl: string,
-  scopes: ReloadScope[],
-): Promise<void> {
-  const url = redisUrl?.trim();
-  if (!url || scopes.length === 0) return;
-  initRedis(redisUrl);
-  const r = getRedis();
-  if (!r) return;
-  await Promise.all(scopes.map((scope) => r.set(key(scope), "1")));
+export async function setReloadFlags(scopes: ReloadScope[]): Promise<void> {
+  const redis = getRedis();
+  if (!redis || scopes.length === 0) return;
+  await Promise.all(scopes.map((s) => redis.publish(channel(s), "reload")));
 }
 
 /**
- * Start watching the given scopes and invoke onReload when any of them is set, then clear those keys.
- * Each worker passes only the scope(s) it cares about (e.g. slack worker passes ['slack']).
+ * Subscribe to the given scopes and invoke onReload when any notification arrives.
+ * Replaces the previous polling-based approach with instant pub/sub.
  */
 export function initReloadWatch(
-  redisUrl: string,
   scopes: ReloadScope[],
   onReload: () => void | Promise<void>,
 ): void {
-  const url = redisUrl.trim();
-  if (!url || scopes.length === 0) return;
+  if (scopes.length === 0) return;
 
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+  if (subscriber) {
+    for (const s of scopes) subscriber.unsubscribe(channel(s));
+    subscriber.close().catch(() => {});
+    subscriber = null;
   }
 
-  initRedis(redisUrl);
-  const redis = getRedis();
-  if (!redis) return;
+  subscriber = createSubscriber();
+  if (!subscriber) return;
 
-  const keys = scopes.map(key);
-
-  pollTimer = setInterval(async () => {
-    try {
-      const values = await redis.mget(...keys);
-      const hit = values.some((v) => v === "1");
-      if (hit) {
-        await redis.del(...keys);
-        await onReload();
-      }
-    } catch {
-      // keep polling on error
-    }
-  }, POLL_MS);
+  for (const s of scopes) {
+    subscriber.subscribe(channel(s), () => {
+      void onReload();
+    });
+  }
 }
 
 /**
  * Stop watching. Does not close the Redis client; call closeRedis() on shutdown.
  */
 export async function closeReloadWatch(): Promise<void> {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+  if (subscriber) {
+    await subscriber.close();
+    subscriber = null;
   }
 }

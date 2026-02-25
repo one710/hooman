@@ -2,7 +2,9 @@ import type { Express, Request, Response } from "express";
 import createDebug from "debug";
 import type { AppContext } from "../utils/helpers.js";
 import { getParam } from "../utils/helpers.js";
-
+import { getRedis } from "../data/redis.js";
+import { DISCOVERED_TOOLS_KEY } from "../capabilities/mcp/manager.js";
+import { requestResponse } from "../utils/pubsub.js";
 const debug = createDebug("hooman:routes:capabilities");
 
 function escapeHtml(s: string): string {
@@ -17,13 +19,41 @@ export function registerCapabilityRoutes(app: Express, ctx: AppContext): void {
   const { mcpService } = ctx;
 
   app.get(
-    "/api/capabilities/mcp/available",
+    "/api/capabilities/mcp/tools",
     async (_req: Request, res: Response) => {
       try {
-        const capabilities = await mcpService.listAvailable();
-        res.json({ capabilities });
+        const redis = getRedis();
+        if (!redis) {
+          res.json({ tools: [] });
+          return;
+        }
+        const raw = await redis.get(DISCOVERED_TOOLS_KEY);
+        const tools = raw ? JSON.parse(raw) : [];
+        res.json({ tools });
       } catch (err) {
-        debug("list available error: %o", err);
+        debug("list tools error: %o", err);
+        res.status(500).json({ error: (err as Error).message });
+      }
+    },
+  );
+
+  app.post(
+    "/api/capabilities/mcp/reload",
+    async (_req: Request, res: Response) => {
+      try {
+        await requestResponse(
+          "hooman:mcp-reload:request",
+          "hooman:mcp-reload:response",
+          "reload",
+          {},
+          60_000,
+        );
+        const redis = getRedis();
+        const raw = redis ? await redis.get(DISCOVERED_TOOLS_KEY) : null;
+        const tools = raw ? JSON.parse(raw) : [];
+        res.json({ tools });
+      } catch (err) {
+        debug("mcp reload error: %o", err);
         res.status(500).json({ error: (err as Error).message });
       }
     },

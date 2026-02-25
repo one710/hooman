@@ -52,15 +52,15 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
         ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}
     >
-      <div className="p-4 border-b border-hooman-border flex items-center justify-between">
-        <div className="flex flex-col">
+      <div className="px-4 md:px-6 py-3 md:py-4 border-b border-hooman-border flex items-center justify-between">
+        <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-white leading-none">
+            <h1 className="text-base md:text-lg font-semibold text-white truncate">
               Hooman
             </h1>
             <HealthBlip />
           </div>
-          <p className="text-xs text-hooman-muted mt-0.5">
+          <p className="text-xs md:text-sm text-hooman-muted truncate">
             Your virtual identity
           </p>
         </div>

@@ -10,7 +10,6 @@ import { randomUUID } from "crypto";
 import { initDb } from "../../data/db.js";
 import { initScheduleStore } from "../../scheduling/schedule-store.js";
 import { setReloadFlag } from "../../utils/reload-flag.js";
-import { env } from "../../env.js";
 
 await initDb();
 const scheduleStore = await initScheduleStore();
@@ -104,9 +103,7 @@ server.registerTool(
       ...(cron ? { cron } : {}),
     });
 
-    if (env.REDIS_URL) {
-      await setReloadFlag(env.REDIS_URL, "schedule");
-    }
+    await setReloadFlag("schedule");
 
     if (cron) {
       return {
@@ -140,9 +137,7 @@ server.registerTool(
     if (!id) return { content: textContent("Error: id is required.") };
     const ok = await scheduleStore.remove(id);
     if (ok) {
-      if (env.REDIS_URL) {
-        await setReloadFlag(env.REDIS_URL, "schedule");
-      }
+      await setReloadFlag("schedule");
       return {
         content: textContent(`Scheduled task ${id} has been cancelled.`),
       };

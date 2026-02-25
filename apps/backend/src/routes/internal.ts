@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import type { AppContext } from "../utils/helpers.js";
 import { getKillSwitchEnabled } from "../agents/kill-switch.js";
 import { getRedis } from "../data/redis.js";
+import { Queue } from "bullmq";
 import { env } from "../env.js";
 
 interface ServiceStatus {
@@ -63,7 +64,6 @@ async function checkEventQueueWorker(): Promise<ServiceStatus> {
   const redis = getRedis();
   if (!redis) return { status: "error", error: "Redis not initialized" };
   try {
-    const { Queue } = await import("bullmq");
     const queue = new Queue("hooman-events", { connection: redis });
     try {
       const workers = await queue.getWorkers();

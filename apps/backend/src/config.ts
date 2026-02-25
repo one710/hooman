@@ -1,5 +1,5 @@
 import createDebug from "debug";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { getWorkspaceConfigPath, WORKSPACE_ROOT } from "./utils/workspace.js";
 import type { ChannelsConfig } from "./types.js";
 import { env } from "./env.js";
@@ -238,7 +238,6 @@ export function updateChannelsConfig(
 
 async function persist(): Promise<void> {
   try {
-    const { mkdir } = await import("fs/promises");
     await mkdir(WORKSPACE_ROOT, { recursive: true });
     const blob = { ...store, channels: channelsStore };
     await writeFile(CONFIG_PATH, JSON.stringify(blob, null, 2), "utf-8");

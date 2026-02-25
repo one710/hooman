@@ -1087,34 +1087,6 @@ paths:
   # ╔══════════════════════════════════════════════════════════════════════╗
   # ║  Capabilities / MCP                                                 ║
   # ╚══════════════════════════════════════════════════════════════════════╝
-  /api/capabilities/mcp/available:
-    get:
-      operationId: getCapabilitiesAvailable
-      summary: List available capabilities from MCP connections
-      description: |
-        Returns a flat list of capabilities discovered from all configured
-        MCP server connections. On error the frontend falls back to an
-        empty array.
-      tags: [Capabilities]
-      responses:
-        "200":
-          description: Available capabilities.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [capabilities]
-                properties:
-                  capabilities:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CapabilityEntry"
-        "500":
-          description: Failed to list capabilities.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
 
   /api/capabilities/mcp/connections:
     get:

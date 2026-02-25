@@ -35,15 +35,13 @@ export async function bootstrapWorker(opts: BootstrapOptions): Promise<void> {
 
   if (opts.initExtra) await opts.initExtra();
 
-  if (env.REDIS_URL) {
-    initRedis(env.REDIS_URL);
-    debug("Redis initialized (%s)", env.REDIS_URL);
-  }
+  initRedis(env.REDIS_URL);
+  debug("Redis initialized (%s)", env.REDIS_URL);
 
   await opts.start();
 
-  if (env.REDIS_URL && opts.reloadScopes.length && opts.onReload) {
-    initReloadWatch(env.REDIS_URL, opts.reloadScopes, async () => {
+  if (opts.reloadScopes.length && opts.onReload) {
+    initReloadWatch(opts.reloadScopes, async () => {
       debug("Reload flag set; reloading");
       await loadPersisted();
       await opts.onReload!();

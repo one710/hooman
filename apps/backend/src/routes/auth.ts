@@ -1,9 +1,9 @@
-import type { Request, Response } from "express";
+import type { Request, Response, Express } from "express";
 import argon2 from "argon2";
 import { env, isWebAuthEnabled } from "../env.js";
 import { signToken } from "../middleware/auth-jwt.js";
 
-export function registerAuthRoutes(app: import("express").Express): void {
+export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     if (!isWebAuthEnabled()) {
       res.status(501).json({

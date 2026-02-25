@@ -11,6 +11,7 @@ import { Button } from "./Button";
 import { Input } from "./Input";
 import { Select } from "./Select";
 import { Textarea } from "./Textarea";
+import { PageHeader } from "./PageHeader";
 
 export type { AppConfig };
 
@@ -110,14 +111,10 @@ export function Settings() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold text-white">
-          Settings
-        </h2>
-        <p className="text-xs md:text-sm text-hooman-muted">
-          Your API keys and how Hooman thinks and remembers.
-        </p>
-      </header>
+      <PageHeader
+        title="Settings"
+        subtitle="Your API keys and how Hooman thinks and remembers."
+      />
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0"
