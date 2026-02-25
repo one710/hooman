@@ -1,10 +1,10 @@
 /**
- * Hooman agent run via Vercel AI SDK (generateText + tools). No personas; MCP and skills attached to main flow.
+ * Hooman agent run via Vercel AI SDK (ToolLoopAgent + tools). No personas; MCP and skills attached to main flow.
  */
 import { createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { getHoomanModel } from "./model-provider.js";
-import { generateText, stepCountIs } from "ai";
+import { ToolLoopAgent, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { listSkillsFromFs } from "../capabilities/skills/skills-cli.js";
 import { readSkillTool } from "../capabilities/skills/skills-tool.js";
@@ -51,10 +51,52 @@ function truncateForAudit(value: unknown): string {
 
 const DEFAULT_MCP_CWD = env.MCP_STDIO_DEFAULT_CWD;
 
+/** @deprecated Use ModelMessage[] for full AI SDK format. */
 export type AgentInputItem = {
   role: "user" | "assistant" | "system";
   content: string;
 };
+
+/** Build AI SDK messages for this turn (user message + assistant tool/text from result) for storage in recollect. */
+function buildTurnMessagesFromResult(
+  newUserMessage: ModelMessage,
+  result: { steps?: unknown[]; text?: string },
+): ModelMessage[] {
+  const out: ModelMessage[] = [newUserMessage];
+  const steps = result.steps ?? [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i] as { toolCalls?: unknown[]; toolResults?: unknown[] };
+    const calls = step.toolCalls ?? [];
+    const results = step.toolResults ?? [];
+    if (calls.length > 0) {
+      const toolCalls = calls.map((c, j) => {
+        const x = c as Record<string, unknown>;
+        return {
+          toolCallId: (x.toolCallId as string) ?? `call_${i}_${j}`,
+          toolName: (x.toolName as string) ?? (x.name as string) ?? "unknown",
+          args: (x.args ?? x.input ?? {}) as Record<string, unknown>,
+        };
+      });
+      out.push({ role: "assistant", content: [], toolCalls } as ModelMessage);
+    }
+    if (results.length > 0) {
+      const content = results.map((r, j) => {
+        const x = r as Record<string, unknown>;
+        return {
+          type: "tool-result" as const,
+          toolCallId: (x.toolCallId as string) ?? `call_${i}_${j}`,
+          result: x.result ?? x.output,
+        };
+      });
+      out.push({ role: "tool", content } as unknown as ModelMessage);
+    }
+  }
+  const finalText = (result.text ?? "").trim();
+  if (finalText.length > 0) {
+    out.push({ role: "assistant", content: finalText });
+  }
+  return out;
+}
 
 function buildSkillsMetadataSection(
   skillIds: string[],
@@ -87,6 +129,8 @@ export interface RunChatOptions {
 
 export interface RunChatResult {
   finalOutput: string;
+  /** Full AI SDK messages for this turn (user + assistant with tool calls/results). Store via context.addTurnMessages for recollect. */
+  turnMessages?: ModelMessage[];
   history: AgentInputItem[];
   newItems: Array<{
     type: string;
@@ -154,7 +198,7 @@ export interface DiscoveredTool {
 /** MCP clients to close after run. */
 export interface HoomanRunnerSession {
   runChat(
-    thread: AgentInputItem[],
+    thread: ModelMessage[],
     newUserMessage: string,
     options?: RunChatOptions,
   ): Promise<RunChatResult>;
@@ -356,109 +400,99 @@ export async function createHoomanRunner(options?: {
           content: `[Channel context] This message originated from an external channel. Your reply will be delivered there automatically; compose a clear response.\n${runOptions.channelContext.trim()}\n\n---`,
         });
       }
-      for (const item of thread) {
-        if (item.role === "user") {
-          input.push({ role: "user", content: item.content });
-        } else if (item.role === "assistant") {
-          input.push({ role: "assistant", content: item.content });
-        } else if (item.role === "system") {
-          input.push({ role: "system", content: item.content });
-        }
-      }
+      input.push(...thread);
       const lastUserContent = buildUserContentParts(
         newUserMessage,
         runOptions?.attachments,
       );
-      input.push({
+      const newUserMsg: ModelMessage = {
         role: "user",
         content:
           lastUserContent.length === 1 && lastUserContent[0].type === "text"
             ? lastUserContent[0].text
             : lastUserContent,
-      });
+      };
+      input.push(newUserMsg);
 
       const maxSteps = runOptions?.maxTurns ?? getConfig().MAX_TURNS ?? 999;
-      const result = await generateText({
+      const agent = new ToolLoopAgent({
         model,
-        system: fullSystem,
-        messages: input,
+        instructions: fullSystem,
         tools,
         stopWhen: stepCountIs(maxSteps),
-        onStepFinish(step) {
-          const calls = step.toolCalls ?? [];
-          const results = step.toolResults ?? [];
-          for (let i = 0; i < calls.length; i++) {
-            const toolCall = calls[i] as { toolName: string; input?: unknown };
-            debug(
-              "Tool call: %s args=%s",
-              toolCall.toolName,
-              truncateForLog(toolCall.input),
-            );
-            if (options?.auditLog) {
-              void options.auditLog.appendAuditEntry({
-                type: "tool_call_start",
-                payload: {
-                  toolName: toolCall.toolName,
-                  input: truncateForAudit(toolCall.input),
-                },
-              });
-            }
-            const resultPart = results[i] as
-              | { toolName: string; output?: unknown }
-              | undefined;
-            if (resultPart) {
-              debug(
-                "Tool result: %s result=%s",
-                resultPart.toolName,
-                truncateForLog(resultPart.output),
-              );
-            }
-            if (options?.auditLog) {
-              void options.auditLog.appendAuditEntry({
-                type: "tool_call_end",
-                payload: {
-                  toolName: toolCall.toolName,
-                  result: resultPart
-                    ? truncateForAudit(resultPart.output)
-                    : "(no result)",
-                },
-              });
-            }
+        experimental_onToolCallStart({ toolCall }) {
+          const name =
+            toolCall.toolName ?? (toolCall as { name?: string }).name;
+          const input =
+            (toolCall as { input?: unknown }).input ??
+            (toolCall as { args?: unknown }).args;
+          debug("Tool call: %s args=%s", name, truncateForLog(input));
+          if (options?.auditLog) {
+            void options.auditLog.appendAuditEntry({
+              type: "tool_call_start",
+              payload: {
+                toolName: name,
+                input: truncateForAudit(input),
+              },
+            });
           }
         },
-      });
-
-      const steps = result.steps ?? [];
-      const stepCount = steps.length;
-      const totalToolCalls = steps.reduce(
-        (n, s) => n + (Array.isArray(s.toolCalls) ? s.toolCalls.length : 0),
-        0,
-      );
-      const finishReason =
-        typeof result.finishReason === "string"
-          ? result.finishReason
-          : String(result.finishReason ?? "unknown");
-      debug(
-        "Run finished: steps=%d toolCalls=%d finishReason=%s",
-        stepCount,
-        totalToolCalls,
-        finishReason,
-      );
-      if (options?.auditLog) {
-        void options.auditLog.appendAuditEntry({
-          type: "run_summary",
-          payload: {
+        experimental_onToolCallFinish({ toolCall, success, output, error }) {
+          const name =
+            toolCall.toolName ?? (toolCall as { name?: string }).name;
+          const result = success ? output : error;
+          debug("Tool result: %s result=%s", name, truncateForLog(result));
+          if (options?.auditLog) {
+            void options.auditLog.appendAuditEntry({
+              type: "tool_call_end",
+              payload: {
+                toolName: name,
+                result:
+                  result !== undefined
+                    ? truncateForAudit(result)
+                    : "(no result)",
+              },
+            });
+          }
+        },
+        onFinish(finishResult) {
+          const steps = finishResult.steps ?? [];
+          const stepCount = steps.length;
+          const totalToolCalls = steps.reduce(
+            (n, s) => n + (Array.isArray(s.toolCalls) ? s.toolCalls.length : 0),
+            0,
+          );
+          const finishReason =
+            typeof finishResult.finishReason === "string"
+              ? finishResult.finishReason
+              : String(finishResult.finishReason ?? "unknown");
+          debug(
+            "Run finished: steps=%d toolCalls=%d finishReason=%s",
             stepCount,
             totalToolCalls,
             finishReason,
-          },
-        });
-      }
+          );
+          if (options?.auditLog) {
+            void options.auditLog.appendAuditEntry({
+              type: "run_summary",
+              payload: {
+                stepCount,
+                totalToolCalls,
+                finishReason,
+              },
+            });
+          }
+        },
+      });
+      const result = await agent.generate({ messages: input });
+
+      const turnMessages = buildTurnMessagesFromResult(newUserMsg, result);
 
       const text =
         result.text ?? (typeof result.finishReason === "string" ? "" : "");
       return {
         finalOutput: text,
+        turnMessages,
         history: [],
         newItems: [],
       };

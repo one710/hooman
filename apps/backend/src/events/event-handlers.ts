@@ -165,7 +165,10 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new ChatTimeoutError()), chatTimeoutMs);
       });
-      const { finalOutput } = await Promise.race([runPromise, timeoutPromise]);
+      const { finalOutput, turnMessages } = await Promise.race([
+        runPromise,
+        timeoutPromise,
+      ]);
       const rawOutput =
         finalOutput?.trim() ||
         "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
@@ -176,13 +179,24 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         eventId: event.id,
         userInput: text,
       });
-      await context.addTurn(userId, text, assistantText, attachments);
+      // Notify frontend/channels immediately so the user sees the reply without waiting for persistence
       await dispatchResponseToChannel(
         event.id,
         event.source,
         channelMeta as ChannelMeta | undefined,
         assistantText,
       );
+      if (turnMessages?.length) {
+        await context.addTurnMessages(userId, turnMessages);
+        await context.addTurnToChatHistory(
+          userId,
+          text,
+          assistantText,
+          attachments,
+        );
+      } else {
+        await context.addTurn(userId, text, assistantText, attachments);
+      }
     } catch (err) {
       if (err instanceof ChatTimeoutError) {
         const chatTimeoutMs =

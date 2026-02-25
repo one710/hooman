@@ -1,25 +1,36 @@
 import { join } from "path";
 import { MemoryLayer } from "@one710/recollect";
+import type { ModelMessage } from "ai";
 import type { ChatHistoryStore } from "../chats/chat-history.js";
 import { getConfig } from "../config.js";
 import { getHoomanModel } from "./model-provider.js";
 import { WORKSPACE_ROOT } from "../utils/workspace.js";
 
+/** @deprecated Use ModelMessage[] for full AI SDK format (tool calls, etc.). Kept for type compatibility. */
 export type ThreadMessage = {
   role: "user" | "assistant" | "system";
   content: string;
 };
 
 export interface ContextStore {
-  /** Persist one user/assistant turn to chat history and recollect. Call only for api-source chat. */
+  /** Persist one user/assistant turn (plain text) to chat history and recollect. */
   addTurn(
     userId: string,
     userText: string,
     assistantText: string,
     userAttachments?: string[],
   ): Promise<void>;
-  /** Token-limited thread for the agent (from recollect; may include system summary). */
-  getThreadForAgent(userId: string): Promise<ThreadMessage[]>;
+  /** Persist a full turn as AI SDK messages (includes tool calls, tool results, etc.). Use when available. Call addTurnToChatHistory too so the UI has the turn. */
+  addTurnMessages(userId: string, messages: ModelMessage[]): Promise<void>;
+  /** Persist one user/assistant turn to chat history only (for UI). Use with addTurnMessages when storing full AI SDK messages in memory. */
+  addTurnToChatHistory(
+    userId: string,
+    userText: string,
+    assistantText: string,
+    userAttachments?: string[],
+  ): Promise<void>;
+  /** Token-limited thread for the agent (from recollect; full AI SDK messages when stored with addTurnMessages). */
+  getThreadForAgent(userId: string): Promise<ModelMessage[]>;
   /** Clear all messages for the user (chat history and recollect). */
   clearAll(userId: string): Promise<void>;
 }
@@ -52,9 +63,27 @@ export function createContext(chatHistory: ChatHistoryStore): ContextStore {
       await memory.addMessage(userId, "assistant", assistantText);
     },
 
-    async getThreadForAgent(userId: string): Promise<ThreadMessage[]> {
-      const msgs = await memory.getMessages(userId);
-      return msgs.map((m) => ({ role: m.role, content: m.content }));
+    async addTurnMessages(
+      userId: string,
+      messages: ModelMessage[],
+    ): Promise<void> {
+      for (const msg of messages) {
+        await memory.addMessage(userId, null, msg);
+      }
+    },
+
+    async addTurnToChatHistory(
+      userId: string,
+      userText: string,
+      assistantText: string,
+      userAttachments?: string[],
+    ): Promise<void> {
+      await chatHistory.addMessage(userId, "user", userText, userAttachments);
+      await chatHistory.addMessage(userId, "assistant", assistantText);
+    },
+
+    async getThreadForAgent(userId: string): Promise<ModelMessage[]> {
+      return memory.getMessages(userId);
     },
 
     async clearAll(userId: string): Promise<void> {

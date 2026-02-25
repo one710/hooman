@@ -38,7 +38,7 @@
     "@mistralai/mistralai": "^1.14.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@one710/consciousness": "^1.0.3",
-    "@one710/recollect": "1.0.1",
+    "@one710/recollect": "^1.0.2",
     "@prisma/client": "5",
     "@slack/bolt": "^4.4.0",
     "ai": "^6.0.86",
