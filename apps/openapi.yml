@@ -1,9 +1,9 @@
 openapi: "3.1.0"
 info:
-  title: Hoomanity API
+  title: Hooman API
   version: "1.0.0"
   description: |
-    REST API consumed by the Hoomanity frontend.
+    REST API consumed by the Hooman frontend.
     All endpoints under `/api/` (except `/api/auth/login`) require a Bearer JWT
     token in the `Authorization` header. A 401 response indicates an expired or
     invalid token; the frontend clears the token and redirects to `/login`.

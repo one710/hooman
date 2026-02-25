@@ -1,4 +1,4 @@
-# ─── Hoomanity Backend ────────────────────────────────────────────────
+# ─── Hooman Backend ────────────────────────────────────────────────
 # Multi-stage build: install deps → generate Prisma client → slim runtime
 #
 # Default CMD runs the API server.  Override for workers:
