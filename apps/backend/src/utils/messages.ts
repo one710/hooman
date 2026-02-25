@@ -51,8 +51,45 @@ export function buildUserContentParts(
   return parts;
 }
 
+/** Normalize raw tool result to AI SDK ToolResultPart output shape (LanguageModelV2ToolResultOutput). */
+function toToolResultOutput(
+  raw: unknown,
+):
+  | { type: "text"; value: string }
+  | { type: "json"; value: unknown }
+  | { type: "error-text"; value: string } {
+  if (raw === undefined || raw === null) {
+    return { type: "text", value: "" };
+  }
+
+  if (typeof raw === "string") {
+    return { type: "text", value: raw };
+  }
+
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.type === "string" && typeof obj.value !== "undefined") {
+    return obj as
+      | { type: "text"; value: string }
+      | { type: "json"; value: unknown }
+      | { type: "error-text"; value: string };
+  }
+
+  if (Array.isArray(obj.content) && typeof obj.isError === "boolean") {
+    const text = (obj.content as Array<{ type?: string; text?: string }>)
+      .filter((p) => p?.type === "text" && typeof p.text === "string")
+      .map((p) => p.text)
+      .join("\n");
+    return obj.isError
+      ? { type: "error-text", value: text || JSON.stringify(obj) }
+      : { type: "text", value: text || JSON.stringify(obj) };
+  }
+
+  return { type: "json", value: raw };
+}
+
 /**
  * Build AI SDK messages for this turn (user message + assistant tool/text from result) for storage in recollect.
+ * Uses ToolResultPart shape: toolCallId, toolName, output (not result) so stored messages validate on read.
  */
 export function buildTurnMessagesFromResult(
   newUserMessage: ModelMessage,
@@ -78,10 +115,19 @@ export function buildTurnMessagesFromResult(
     if (results.length > 0) {
       const content = results.map((r, j) => {
         const x = r as Record<string, unknown>;
+        const toolCallId = (x.toolCallId as string) ?? `call_${i}_${j}`;
+        const call = calls[j] as Record<string, unknown> | undefined;
+        const toolName =
+          (call?.toolName as string) ??
+          (call?.name as string) ??
+          (x.toolName as string) ??
+          "unknown";
+        const raw = x.result ?? x.output;
         return {
           type: "tool-result" as const,
-          toolCallId: (x.toolCallId as string) ?? `call_${i}_${j}`,
-          result: x.result ?? x.output,
+          toolCallId,
+          toolName,
+          output: toToolResultOutput(raw),
         };
       });
       out.push({ role: "tool", content } as unknown as ModelMessage);
