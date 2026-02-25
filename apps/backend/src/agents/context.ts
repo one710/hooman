@@ -84,9 +84,21 @@ export function createContext(chatHistory: ChatHistoryStore): ContextStore {
 
     async getThreadForAgent(userId: string): Promise<ModelMessage[]> {
       const messages = await memory.getMessages(userId);
-      return messages.map((msg) =>
-        msg.role === "system" ? { ...msg, role: "user" as const } : msg,
-      );
+      return messages.map((msg) => {
+        if (msg.role === "system") {
+          return { ...msg, role: "user" as const };
+        }
+        // Bedrock (and some other providers) reject assistant messages with empty content.
+        // Tool-call-only turns have content: []; give them a single space so the API accepts.
+        if (
+          msg.role === "assistant" &&
+          Array.isArray(msg.content) &&
+          msg.content.length === 0
+        ) {
+          return { ...msg, content: "(empty)" };
+        }
+        return msg;
+      });
     },
 
     async clearAll(userId: string): Promise<void> {
