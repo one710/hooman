@@ -83,7 +83,12 @@ export function createContext(chatHistory: ChatHistoryStore): ContextStore {
     },
 
     async getThreadForAgent(userId: string): Promise<ModelMessage[]> {
-      return memory.getMessages(userId);
+      const messages = await memory.getMessages(userId);
+      return messages.map((msg) =>
+        msg.role === "system"
+          ? ({ ...msg, role: "user" as const })
+          : msg,
+      );
     },
 
     async clearAll(userId: string): Promise<void> {

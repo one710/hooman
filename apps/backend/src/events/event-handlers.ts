@@ -78,6 +78,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       }
       return;
     }
+
     if (source === "api" && publishResponse) {
       return publishResponse({
         channel: "api",
@@ -85,6 +86,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         message: { role: "assistant", text: assistantText },
       });
     }
+
     if (source === "slack" && publishResponse) {
       const meta = channelMeta as SlackChannelMeta | undefined;
       if (meta?.channel === "slack") {
@@ -99,6 +101,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         return publishResponse(payload);
       }
     }
+
     if (source === "whatsapp" && publishResponse) {
       const meta = channelMeta as WhatsAppChannelMeta | undefined;
       if (meta?.channel === "whatsapp") {
@@ -187,6 +190,7 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
         const msg = (err as Error).message;
         assistantText = `Something went wrong: ${msg}. Check API logs.`;
       }
+
       await context.addTurn(userId, text, assistantText, attachments);
       await dispatchResponseToChannel(
         event.id,
