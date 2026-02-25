@@ -111,22 +111,15 @@ export function buildTurnMessagesFromResult(
         };
       });
       out.push({ role: "assistant", content: [], toolCalls } as ModelMessage);
-    }
-    if (results.length > 0) {
-      const content = results.map((r, j) => {
-        const x = r as Record<string, unknown>;
-        const toolCallId = (x.toolCallId as string) ?? `call_${i}_${j}`;
-        const call = calls[j] as Record<string, unknown> | undefined;
-        const toolName =
-          (call?.toolName as string) ??
-          (call?.name as string) ??
-          (x.toolName as string) ??
-          "unknown";
-        const raw = x.result ?? x.output;
+      // Store exactly one tool-result per tool-call, in order (toolCallId/toolName from call).
+      // So stored format matches Bedrock/AI SDK and we never have more results than calls.
+      const content = toolCalls.map((call, j) => {
+        const r = results[j] as Record<string, unknown> | undefined;
+        const raw = r?.result ?? r?.output;
         return {
           type: "tool-result" as const,
-          toolCallId,
-          toolName,
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
           output: toToolResultOutput(raw),
         };
       });
