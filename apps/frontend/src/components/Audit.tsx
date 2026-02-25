@@ -1,39 +1,54 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 import type { AuditEntry } from "../types";
 import { getAudit } from "../api";
 import { getSocket } from "../socket";
+import { Button } from "./Button";
 
 export function Audit() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    getAudit()
+      .then((r) => setEntries(r.entries))
+      .catch((e) => setError((e as Error).message))
+      .finally(() => setLoading(false));
+  }, []);
+
   useEffect(() => {
-    const load = () => {
-      setLoading(true);
-      setError(null);
-      getAudit()
-        .then((r) => setEntries(r.entries))
-        .catch((e) => setError((e as Error).message))
-        .finally(() => setLoading(false));
-    };
     load();
     const socket = getSocket();
     socket.on("connect", load);
     return () => {
       socket.off("connect", load);
     };
-  }, []);
+  }, [load]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold text-white">
-          Audit log
-        </h2>
-        <p className="text-xs md:text-sm text-hooman-muted">
-          See what Hooman did and why.
-        </p>
+      <header className="border-b border-hooman-border px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-base md:text-lg font-semibold text-white">
+            Audit log
+          </h2>
+          <p className="text-xs md:text-sm text-hooman-muted">
+            See what Hooman did and why.
+          </p>
+        </div>
+        <Button
+          onClick={load}
+          variant="secondary"
+          className="self-start sm:self-auto"
+          icon={
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          }
+        >
+          Refresh
+        </Button>
       </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
         {error && (
