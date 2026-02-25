@@ -70,6 +70,7 @@ You chat with Hooman; Hooman uses memory, MCP tools, and skills, and responds. S
   go install github.com/korotovsky/slack-mcp-server@latest
   ```
   Ensure the Go bin directory (e.g. `$HOME/go/bin`) is on your `PATH` so `slack-mcp-server` is available.
+- **Docker** — Required for the default desktop-commander MCP server (runs as a container). Install [Docker](https://docs.docker.com/get-docker/) and ensure the Docker daemon is running.
 
 No separate database server: the app uses Prisma + SQLite.
 
@@ -173,7 +174,7 @@ Without these env vars, behavior is unchanged: only localhost can access the web
 
 These steps are intended to be run on the server. Replace `hooman.example.com` and `api.hooman.example.com` with your domains in the nginx configs and certbot command.
 
-**1. Install Node, Yarn, Python (uv), Go, Redis**
+**1. Install Node, Yarn, Python (uv), Go, Docker, Redis**
 
 ```bash
 # Install nvm (Node version manager)
@@ -197,6 +198,10 @@ sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.0.linux-amd64.ta
 # Install Redis (event queue and kill switch)
 sudo apt update
 sudo apt install redis-server
+
+# Install Docker (for desktop-commander MCP and Docker Compose)
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
 ```
 
 **2. Clone, build, and run Hooman**

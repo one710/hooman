@@ -77,6 +77,7 @@ services:
       - CHROMA_URL=http://chroma:8000
       - ALLOW_REMOTE_ACCESS=true
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - mcpcwd:/mcpcwd
       - workspace:/app/workspace
 
@@ -97,6 +98,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - CHROMA_URL=http://chroma:8000
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - mcpcwd:/mcpcwd
       - workspace:/app/workspace
 
@@ -117,6 +119,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - CHROMA_URL=http://chroma:8000
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - mcpcwd:/mcpcwd
       - workspace:/app/workspace
 
@@ -137,6 +140,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - CHROMA_URL=http://chroma:8000
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - mcpcwd:/mcpcwd
       - workspace:/app/workspace
 
@@ -157,6 +161,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - CHROMA_URL=http://chroma:8000
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - mcpcwd:/mcpcwd
       - workspace:/app/workspace
 
