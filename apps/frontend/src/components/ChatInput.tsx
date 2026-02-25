@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   X,
   Loader2,
@@ -14,6 +14,33 @@ import {
 } from "../api";
 import { Button } from "./Button";
 import { VoiceBar, VoiceButton, useVoice } from "./ChatVoice";
+
+const CHAT_DRAFT_KEY = "hooman:chat-draft";
+
+function getChatDraft(): string {
+  try {
+    return localStorage.getItem(CHAT_DRAFT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function setChatDraft(value: string): void {
+  try {
+    if (value) localStorage.setItem(CHAT_DRAFT_KEY, value);
+    else localStorage.removeItem(CHAT_DRAFT_KEY);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearChatDraft(): void {
+  try {
+    localStorage.removeItem(CHAT_DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 const MAX_ATTACHMENTS = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -88,9 +115,18 @@ export function ChatInput({
   queue: QueuedMessage[];
   onRemoveFromQueue: (index: number) => void;
 }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(getChatDraft);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    textInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    setChatDraft(input);
+  }, [input]);
   const pendingVoiceRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -153,6 +189,7 @@ export function ChatInput({
     if (attachments.some((a) => a.uploading)) return;
     const messageText = text || "(attachments)";
     setInput("");
+    clearChatDraft();
     const attachmentIds = ready.length ? ready.map((a) => a.id) : undefined;
     const attachmentMetas = ready.length
       ? ready.map((a) => ({
@@ -299,6 +336,7 @@ export function ChatInput({
         />
         <div className="flex-1 min-w-0 relative">
           <input
+            ref={textInputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
