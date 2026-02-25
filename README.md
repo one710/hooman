@@ -70,7 +70,7 @@ You chat with Hooman; Hooman uses memory, MCP tools, and skills, and responds. S
   go install github.com/korotovsky/slack-mcp-server@latest
   ```
   Ensure the Go bin directory (e.g. `$HOME/go/bin`) is on your `PATH` so `slack-mcp-server` is available.
-- **Docker** — Required for the default desktop-commander MCP server (runs as a container). Install [Docker](https://docs.docker.com/get-docker/) and ensure the Docker daemon is running.
+- **Docker** — Some tools may require isolation i.e., running as a Docker container. Install [Docker](https://docs.docker.com/get-docker/) and ensure the Docker daemon is running.
 
 No separate database server: the app uses Prisma + SQLite.
 
