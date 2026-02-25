@@ -70,12 +70,11 @@ async function main() {
   registerEventHandlers({
     eventRouter,
     context,
-    mcpConnectionsStore,
     auditLog,
     publishResponseDelivery: (payload) => {
       publish(RESPONSE_DELIVERY_CHANNEL, JSON.stringify(payload));
     },
-    getMcpManager: () => mcpManager,
+    mcpManager,
   });
 
   const eventQueue = createEventQueue({ connection: env.REDIS_URL });

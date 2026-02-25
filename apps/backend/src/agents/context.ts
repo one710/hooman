@@ -2,7 +2,7 @@ import { join } from "path";
 import { MemoryLayer } from "@one710/recollect";
 import type { ChatHistoryStore } from "../chats/chat-history.js";
 import { getConfig } from "../config.js";
-import { getHoomanModel } from "./hooman-runner.js";
+import { getHoomanModel } from "./model-provider.js";
 import { WORKSPACE_ROOT } from "../utils/workspace.js";
 
 export type ThreadMessage = {

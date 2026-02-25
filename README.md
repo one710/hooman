@@ -45,11 +45,11 @@ One identity, one memory, one audit trail—whether you message from the web, Sl
 
 ## How it works
 
-| Concept          | What it is                                                                                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Hooman**       | A virtual identity. Reasons over memory, handles messages and scheduled tasks, and uses MCP tools and skills as needed.    |
-| **Capabilities** | MCP servers (fetch, time, filesystem, or your own) and skills. Attached to Hooman; configure in Capabilities and Settings. |
-| **Memory**       | Chat history (Prisma) so Hooman can use past context.                                                                      |
+| Concept          | What it is                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hooman**       | A virtual identity. Reasons over memory, handles messages and scheduled tasks, and uses MCP tools and skills as needed.                         |
+| **Capabilities** | MCP servers (fetch, time, filesystem, sequential thinking, or your own) and skills. Attached to Hooman; configure in Capabilities and Settings. |
+| **Memory**       | Chat history (Prisma) so Hooman can use past context.                                                                                           |
 
 You chat with Hooman; Hooman uses memory, MCP tools, and skills, and responds. Scheduled tasks run the same way—at a set time, Hooman processes the task like a message (reasoning, tools, audit).
 
@@ -282,8 +282,9 @@ When running locally, create a `.env` from `.env.example`. Key variables:
 | `PUPPETEER_EXECUTABLE_PATH` | No       | Path to Chrome/Chromium for whatsapp-web.js (Puppeteer). If unset, adapter may use a platform default.          |
 | `CHROMA_URL`                | No       | ChromaDB URL for the memory MCP server (default `http://localhost:8000`).                                       |
 | `CHROMA_COLLECTION`         | No       | ChromaDB collection name for the memory MCP server (default `hooman-memory`).                                   |
+| `ALLOW_REMOTE_ACCESS`       | No       | Set to `true` to bypass localhost-only check in Docker/remote environments.                                     |
 
-All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, and models are set in the **Settings** UI (persisted by the API), not via env. The **MCP Server Manager** is always enabled in the event-queue worker to reuse one MCP session (active_servers, drop_failed_servers, reconnect).
+All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, and models are set in the **Settings** UI (persisted by the API), not via env. The event-queue worker reuses a single long-lived MCP session (active_servers, drop_failed_servers, reconnect). Hooman is configured to use the **sequential thinking** server for analytical and coding tasks to ensure structural reasoning.
 
 ---
 

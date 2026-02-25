@@ -1,5 +1,5 @@
 /**
- * Long-lived MCP session manager. When MCP_USE_SERVER_MANAGER is enabled,
+ * Long-lived MCP session manager. Always enabled;
  * the event-queue worker uses this to init MCPs once and reuse them; reload()
  * closes and clears cache so the next getSession() rebuilds from current connections.
  */

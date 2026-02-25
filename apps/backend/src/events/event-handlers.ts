@@ -5,11 +5,8 @@
 import createDebug from "debug";
 import type { EventRouter } from "./event-router.js";
 import type { ContextStore } from "../agents/context.js";
-import { MCPConnectionsStore } from "../capabilities/mcp/connections-store.js";
 import type { AuditLog } from "../audit/audit.js";
 import { McpManager } from "../capabilities/mcp/manager.js";
-import { getAllDefaultMcpConnections } from "../capabilities/mcp/system-mcps.js";
-import { createHoomanRunner } from "../agents/hooman-runner.js";
 import type {
   RawDispatchInput,
   ChannelMeta,
@@ -64,25 +61,20 @@ class ChatTimeoutError extends Error {
 export interface EventHandlerDeps {
   eventRouter: EventRouter;
   context: ContextStore;
-  mcpConnectionsStore: MCPConnectionsStore;
   auditLog: AuditLog;
   /** When set (event-queue worker), publishes response to Redis; API/Slack/WhatsApp subscribers deliver accordingly. */
   publishResponseDelivery?: (payload: ResponseDeliveryPayload) => void;
-  /** When set and MCP_USE_SERVER_MANAGER is true, use long-lived MCP session instead of per-run create/close. */
-  mcpManager?: McpManager;
-  /** Prefer this over mcpManager so the worker can enable/disable the manager without restart. */
-  getMcpManager?: () => McpManager | undefined;
+  /** Long-lived MCP session manager. */
+  mcpManager: McpManager;
 }
 
 export function registerEventHandlers(deps: EventHandlerDeps): void {
   const {
     eventRouter,
     context,
-    mcpConnectionsStore,
     auditLog,
     publishResponseDelivery,
-    mcpManager: mcpManagerDep,
-    getMcpManager,
+    mcpManager,
   } = deps;
 
   function dispatchResponseToChannel(
@@ -176,67 +168,49 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
       },
     });
     let assistantText = "";
-    const mcpManager = getMcpManager?.() ?? mcpManagerDep;
     try {
       const thread = await context.getThreadForAgent(userId);
-      const session = mcpManager
-        ? await mcpManager.getSession()
-        : await createHoomanRunner({
-            connections: [
-              ...getAllDefaultMcpConnections(),
-              ...(await mcpConnectionsStore.getAll()),
-            ],
-            mcpConnectionsStore,
-            auditLog,
-            sessionId: userId,
-          });
-      try {
-        const channelContext = buildChannelContext(
-          channelMeta as ChannelMeta | undefined,
-        );
-        const runPromise = session.runChat(thread, text, {
-          channelContext,
-          attachments: attachmentContents,
-          sessionId: userId,
-        });
-        const chatTimeoutMs =
-          getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new ChatTimeoutError()), chatTimeoutMs);
-        });
-        const { finalOutput } = await Promise.race([
-          runPromise,
-          timeoutPromise,
-        ]);
-        const rawOutput =
-          finalOutput?.trim() ||
-          "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
-        assistantText = rawOutput;
-        auditLog.emitResponse({
-          type: "response",
-          text: assistantText,
-          eventId: event.id,
-          userInput: text,
-        });
-        await eventRouter.dispatch({
-          source: "api",
-          type: "chat.turn_completed",
-          payload: {
-            userId,
-            userText: text,
-            assistantText,
-            ...(attachments?.length ? { userAttachments: attachments } : {}),
-          },
-        } as RawDispatchInput);
-        await dispatchResponseToChannel(
-          event.id,
-          event.source,
-          channelMeta as ChannelMeta | undefined,
+      const session = await mcpManager.getSession();
+      const channelContext = buildChannelContext(
+        channelMeta as ChannelMeta | undefined,
+      );
+      const runPromise = session.runChat(thread, text, {
+        channelContext,
+        attachments: attachmentContents,
+        sessionId: userId,
+      });
+      const chatTimeoutMs =
+        getConfig().CHAT_TIMEOUT_MS || DEFAULT_CHAT_TIMEOUT_MS;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new ChatTimeoutError()), chatTimeoutMs);
+      });
+      const { finalOutput } = await Promise.race([runPromise, timeoutPromise]);
+      const rawOutput =
+        finalOutput?.trim() ||
+        "I didn't get a clear response. Try rephrasing or check your API key and model settings.";
+      assistantText = rawOutput;
+      auditLog.emitResponse({
+        type: "response",
+        text: assistantText,
+        eventId: event.id,
+        userInput: text,
+      });
+      await eventRouter.dispatch({
+        source: "api",
+        type: "chat.turn_completed",
+        payload: {
+          userId,
+          userText: text,
           assistantText,
-        );
-      } finally {
-        if (!mcpManager) await session.closeMcp();
-      }
+          ...(attachments?.length ? { userAttachments: attachments } : {}),
+        },
+      } as RawDispatchInput);
+      await dispatchResponseToChannel(
+        event.id,
+        event.source,
+        channelMeta as ChannelMeta | undefined,
+        assistantText,
+      );
     } catch (err) {
       if (err instanceof ChatTimeoutError) {
         const chatTimeoutMs =
@@ -278,42 +252,31 @@ export function registerEventHandlers(deps: EventHandlerDeps): void {
             .map(([k, v]) => `${k}=${String(v)}`)
             .join(", ");
     const text = `Scheduled task: ${payload.intent}. Context: ${contextStr}.`;
-    const mcpManager = getMcpManager?.() ?? mcpManagerDep;
     try {
-      const session = mcpManager
-        ? await mcpManager.getSession()
-        : await createHoomanRunner({
-            connections: await mcpConnectionsStore.getAll(),
-            mcpConnectionsStore,
-            auditLog,
-          });
-      try {
-        const { finalOutput } = await session.runChat([], text, {
-          sessionId: payload.context.userId
-            ? String(payload.context.userId)
-            : undefined,
-        });
-        const assistantText =
-          finalOutput?.trim() ||
-          "Scheduled task completed (no clear response from agent).";
-        await auditLog.appendAuditEntry({
-          type: "scheduled_task",
-          payload: {
-            intent: payload.intent,
-            context: payload.context,
-            ...(payload.execute_at ? { execute_at: payload.execute_at } : {}),
-            ...(payload.cron ? { cron: payload.cron } : {}),
-          },
-        });
-        auditLog.emitResponse({
-          type: "response",
-          text: assistantText,
-          eventId: event.id,
-          userInput: text,
-        });
-      } finally {
-        if (!mcpManager) await session.closeMcp();
-      }
+      const session = await mcpManager.getSession();
+      const { finalOutput } = await session.runChat([], text, {
+        sessionId: payload.context.userId
+          ? String(payload.context.userId)
+          : undefined,
+      });
+      const assistantText =
+        finalOutput?.trim() ||
+        "Scheduled task completed (no clear response from agent).";
+      await auditLog.appendAuditEntry({
+        type: "scheduled_task",
+        payload: {
+          intent: payload.intent,
+          context: payload.context,
+          ...(payload.execute_at ? { execute_at: payload.execute_at } : {}),
+          ...(payload.cron ? { cron: payload.cron } : {}),
+        },
+      });
+      auditLog.emitResponse({
+        type: "response",
+        text: assistantText,
+        eventId: event.id,
+        userInput: text,
+      });
     } catch (err) {
       debug("scheduled task handler error: %o", err);
       const msg = (err as Error).message;

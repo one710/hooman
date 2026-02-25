@@ -8,7 +8,6 @@ const debug = createDebug("hooman:api");
 import { AuditLog } from "./audit/audit.js";
 import type { ResponsePayload } from "./audit/audit.js";
 import { getConfig, loadPersisted } from "./config.js";
-import { loadPrompts } from "./utils/prompts.js";
 import { registerRoutes } from "./routes/index.js";
 import { localhostOnly } from "./middleware/localhost-only.js";
 import { authJwt, verifyToken } from "./middleware/auth-jwt.js";
@@ -51,7 +50,6 @@ async function main() {
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
   mkdirSync(WORKSPACE_MCPCWD, { recursive: true });
 
-  await loadPrompts();
   await loadPersisted();
 
   const redisUrl = env.REDIS_URL;
