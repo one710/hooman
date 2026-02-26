@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Mic, X, Check, Loader2 } from "lucide-react";
-import { getRealtimeClientSecret } from "../api";
+import { getToken } from "../auth";
+import { getRealtimeClientSecret, getRealtimeWsUrl } from "../api";
 import { Button } from "./Button";
 
 export interface VoiceState {
@@ -19,12 +20,26 @@ export function useVoice(onConfirm: (text: string) => void) {
   const [voiceConnecting, setVoiceConnecting] = useState(false);
   const voicePcRef = useRef<RTCPeerConnection | null>(null);
   const voiceStreamRef = useRef<MediaStream | null>(null);
+  const voiceWsRef = useRef<WebSocket | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceAudioCtxRef = useRef<AudioContext | null>(null);
 
   const endSession = useCallback(() => {
     voiceStreamRef.current?.getTracks().forEach((t) => t.stop());
     voiceStreamRef.current = null;
     voicePcRef.current?.close();
     voicePcRef.current = null;
+    const ws = voiceWsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "CloseStream" }));
+    }
+    voiceWsRef.current?.close();
+    voiceWsRef.current = null;
+    voiceRecorderRef.current?.state === "recording" &&
+      voiceRecorderRef.current?.stop();
+    voiceRecorderRef.current = null;
+    voiceAudioCtxRef.current?.close().catch(() => {});
+    voiceAudioCtxRef.current = null;
   }, []);
 
   const cancel = useCallback(() => {
@@ -53,7 +68,156 @@ export function useVoice(onConfirm: (text: string) => void) {
     setVoiceTranscript("");
     setVoiceConnecting(true);
     try {
-      const { value: ephemeralKey } = await getRealtimeClientSecret();
+      const { provider, value: ephemeralKey } = await getRealtimeClientSecret();
+
+      if (provider === "deepgram") {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        voiceStreamRef.current = stream;
+        const token = getToken();
+        const wsUrl = getRealtimeWsUrl(token);
+        const ws = new WebSocket(wsUrl);
+        voiceWsRef.current = ws;
+
+        ws.onopen = () => {
+          const recorder = new MediaRecorder(stream, {
+            mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+              ? "audio/webm;codecs=opus"
+              : "audio/webm",
+            audioBitsPerSecond: 16000,
+          });
+          voiceRecorderRef.current = recorder;
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+              ws.send(e.data);
+            }
+          };
+          recorder.start(250);
+          setVoiceActive(true);
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data as string) as {
+              type?: string;
+              is_final?: boolean;
+              channel?: {
+                alternatives?: Array<{ transcript?: string }>;
+              };
+            };
+            if (data.type !== "Results" || !data.channel?.alternatives?.[0])
+              return;
+            const text = (data.channel.alternatives[0].transcript ?? "").trim();
+            if (!text) return;
+            if (data.is_final) {
+              setVoiceTranscript((prev) => (prev ? `${prev} ${text}` : text));
+              setVoiceSegment("");
+            } else {
+              setVoiceSegment(text);
+            }
+          } catch {
+            // ignore non-JSON
+          }
+        };
+
+        ws.onerror = () => {
+          setVoiceError("Connection error");
+          endSession();
+        };
+        ws.onclose = (ev) => {
+          if (voiceWsRef.current === ws) {
+            setVoiceError(ev.reason || "Connection closed");
+            endSession();
+          }
+        };
+        return;
+      }
+
+      if (provider === "azure") {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        voiceStreamRef.current = stream;
+        const token = getToken();
+        const wsUrl = getRealtimeWsUrl(token);
+        const ws = new WebSocket(wsUrl);
+        voiceWsRef.current = ws;
+
+        ws.onopen = () => {
+          const audioCtx = new AudioContext({ sampleRate: 24000 });
+          voiceAudioCtxRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+          const silentGain = audioCtx.createGain();
+          silentGain.gain.value = 0;
+          source.connect(processor);
+          processor.connect(silentGain);
+          silentGain.connect(audioCtx.destination);
+
+          processor.onaudioprocess = (e) => {
+            if (ws.readyState !== WebSocket.OPEN) return;
+            const float32 = e.inputBuffer.getChannelData(0);
+            const int16 = new Int16Array(float32.length);
+            for (let i = 0; i < float32.length; i++) {
+              const s = Math.max(-1, Math.min(1, float32[i]));
+              int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            ws.send(int16.buffer);
+          };
+
+          setVoiceActive(true);
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const event = JSON.parse(e.data as string) as {
+              type?: string;
+              delta?: string;
+              transcript?: string;
+            };
+            if (
+              event.type ===
+                "conversation.item.input_audio_transcription.delta" &&
+              event.delta
+            ) {
+              setVoiceSegment((prev) => prev + event.delta);
+            }
+            if (
+              event.type ===
+                "conversation.item.input_audio_transcription.completed" &&
+              event.transcript != null
+            ) {
+              const final = String(event.transcript).trim();
+              if (final)
+                setVoiceTranscript((prev) =>
+                  prev ? `${prev} ${final}` : final,
+                );
+              setVoiceSegment("");
+            }
+          } catch {
+            // ignore non-JSON
+          }
+        };
+
+        ws.onerror = () => {
+          setVoiceError("Connection error");
+          endSession();
+        };
+        ws.onclose = (ev) => {
+          if (voiceWsRef.current === ws) {
+            setVoiceError(ev.reason || "Connection closed");
+            endSession();
+          }
+        };
+        return;
+      }
+
+      // OpenAI Realtime (WebRTC)
+      if (!ephemeralKey) {
+        throw new Error("OpenAI client secret not returned");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       voiceStreamRef.current = stream;
       const pc = new RTCPeerConnection();

@@ -24,7 +24,7 @@ Hooman gives you a **platform** to create and operate a virtual identity—not a
 
 - **One front door** — Chat, schedule, and inspect everything through Hooman.
 - **MCP and skills** — Capabilities (MCP servers and skills) are attached to your identity. Add connections and skills in the UI; Hooman uses them when relevant.
-- **Multiple LLM providers** — In Settings, choose an LLM provider (OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Google Generative AI, Google Vertex, Mistral, or DeepSeek) for chat. Choose a transcription provider (OpenAI, Azure, or Deepgram) for voice and audio (e.g. WhatsApp voice notes).
+- **Multiple LLM providers** — In Settings, choose an LLM provider (OpenAI, Azure OpenAI, Anthropic, Amazon Bedrock, Google Generative AI, Google Vertex, Mistral, or DeepSeek) for chat. Choose a transcription provider (OpenAI, Azure, or Deepgram) for voice and audio (e.g. web mic, WhatsApp voice notes). When using Azure for chat and/or transcription, configure the relevant resource name(s) in Settings—chat and real-time transcription use separate fields.
 - **Under your control** — Kill switch, capability approvals, and a full audit log so you see who did what and when.
 
 ---
@@ -35,7 +35,7 @@ Talk to your virtual identity from the channels you already use. Each channel is
 
 | Channel      | What you get                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Web**      | Built-in chat UI at the heart of the app. Your main control panel for chatting, scheduling, capabilities, and audit.                             |
+| **Web**      | Built-in chat UI at the heart of the app. Your main control panel for chatting, scheduling, capabilities, and audit. Chat draft is kept in browser storage when you navigate away and restored on return; message input is auto-focused; logout and clear chat require confirmation. Real-time voice uses your chosen transcription provider via a backend WebSocket proxy. |
 | **Slack**    | First-party adapter (Socket Mode). DMs, channels, and groups where the app is installed. Optional Slack MCP (Go) adds history, search, and post. |
 | **WhatsApp** | First-party adapter (whatsapp-web.js). Text and voice notes; voice is transcribed with your chosen transcription provider.                       |
 
@@ -284,7 +284,7 @@ When running locally, create a `.env` from `.env.example`. Key variables:
 | `CHROMA_COLLECTION`         | No       | ChromaDB collection name for the memory MCP server (default `hooman-memory`).                                   |
 | `ALLOW_REMOTE_ACCESS`       | No       | Set to `true` to bypass localhost-only check in Docker/remote environments.                                     |
 
-All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, and models are set in the **Settings** UI (persisted by the API), not via env. The event-queue worker reuses a single long-lived MCP session (active_servers, drop_failed_servers, reconnect). Hooman is configured to use the **sequential thinking** server for analytical and coding tasks to ensure structural reasoning.
+All runtime data is stored under **`workspace/`** at project root: `hooman.db` (Prisma), `config.json` (Settings), and `attachments/`. Stdio MCP servers use `workspace/mcpcwd` by default. LLM provider, transcription provider, API keys or credentials, and models are set in the **Settings** UI (persisted by the API), not via env. When the API is unhealthy (e.g. 4xx/5xx or invalid status response), the web UI shows a yellow status with a tooltip describing what failed. The event-queue worker reuses a single long-lived MCP session (active_servers, drop_failed_servers, reconnect). Hooman is configured to use the **sequential thinking** server for analytical and coding tasks to ensure structural reasoning.
 
 ---
 

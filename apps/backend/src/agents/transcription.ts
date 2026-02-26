@@ -116,11 +116,13 @@ function getTranscriptionModel(
       return openai.transcription(modelId);
     }
     case "azure": {
-      const resourceName = (config.AZURE_RESOURCE_NAME ?? "").trim();
+      const resourceName = (
+        config.AZURE_TRANSCRIPTION_RESOURCE_NAME ?? ""
+      ).trim();
       const apiKey = (config.AZURE_API_KEY ?? "").trim();
       if (!resourceName || !apiKey) {
         throw new Error(
-          "Transcription (Azure) requires AZURE_RESOURCE_NAME and AZURE_API_KEY. Set them in Settings.",
+          "Transcription (Azure) requires AZURE_TRANSCRIPTION_RESOURCE_NAME and AZURE_API_KEY. Set them in Settings.",
         );
       }
       const deployment =

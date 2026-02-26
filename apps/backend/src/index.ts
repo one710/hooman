@@ -10,6 +10,7 @@ import type { ResponsePayload } from "./audit/audit.js";
 import { getConfig, loadPersisted } from "./config.js";
 import type { RawDispatchInput } from "./types.js";
 import { registerRoutes } from "./routes/index.js";
+import { attachTranscribeWs } from "./routes/transcribe-ws.js";
 import { localhostOnly } from "./middleware/localhost-only.js";
 import { authJwt, verifyToken } from "./middleware/auth-jwt.js";
 import { initDb } from "./data/db.js";
@@ -119,6 +120,7 @@ async function main() {
   }
 
   const server = http.createServer(app);
+  attachTranscribeWs(server);
   const io = new SocketServer(server, {
     cors: { origin: true },
     path: "/socket.io",

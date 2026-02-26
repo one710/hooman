@@ -71,7 +71,9 @@ export function Settings() {
         TRANSCRIPTION_MODEL: form.TRANSCRIPTION_MODEL,
         AGENT_NAME: form.AGENT_NAME,
         AGENT_INSTRUCTIONS: form.AGENT_INSTRUCTIONS,
-        AZURE_RESOURCE_NAME: form.AZURE_RESOURCE_NAME,
+        AZURE_CHAT_RESOURCE_NAME: form.AZURE_CHAT_RESOURCE_NAME,
+        AZURE_TRANSCRIPTION_RESOURCE_NAME:
+          form.AZURE_TRANSCRIPTION_RESOURCE_NAME,
         AZURE_API_KEY: form.AZURE_API_KEY,
         AZURE_API_VERSION: form.AZURE_API_VERSION,
         DEEPGRAM_API_KEY: form.DEEPGRAM_API_KEY,
@@ -351,23 +353,52 @@ export function Settings() {
                   Used for chat when LLM is Azure; for transcription when
                   Transcription provider is Azure.
                 </p>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1">
-                    Azure – Resource name
-                  </label>
-                  <Input
-                    type="text"
-                    value={form.AZURE_RESOURCE_NAME ?? ""}
-                    onChange={(e) =>
-                      setForm((f) =>
-                        f ? { ...f, AZURE_RESOURCE_NAME: e.target.value } : f,
-                      )
-                    }
-                    placeholder="my-resource"
-                    className="bg-hooman-surface focus:ring-offset-hooman-surface"
-                    autoComplete="off"
-                  />
-                </div>
+                {(form.LLM_PROVIDER ?? "openai") === "azure" && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Azure – Resource name (chat)
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.AZURE_CHAT_RESOURCE_NAME ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f
+                            ? { ...f, AZURE_CHAT_RESOURCE_NAME: e.target.value }
+                            : f,
+                        )
+                      }
+                      placeholder="my-resource"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                {(form.TRANSCRIPTION_PROVIDER ?? "openai") === "azure" && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Azure – Resource name (transcription)
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.AZURE_TRANSCRIPTION_RESOURCE_NAME ?? ""}
+                      onChange={(e) =>
+                        setForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                AZURE_TRANSCRIPTION_RESOURCE_NAME:
+                                  e.target.value,
+                              }
+                            : f,
+                        )
+                      }
+                      placeholder="my-resource"
+                      className="bg-hooman-surface focus:ring-offset-hooman-surface"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1">
                     Azure – API key

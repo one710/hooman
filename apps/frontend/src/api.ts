@@ -131,9 +131,20 @@ export function getAttachmentUrl(id: string): string {
   return `${BASE}/api/chat/attachments/${encodeURIComponent(id)}`;
 }
 
-/** Ephemeral client secret for Realtime API transcription (voice input). */
+/** WebSocket URL for Deepgram live transcription proxy (voice input when provider is deepgram). */
+export function getRealtimeWsUrl(token: string | null): string {
+  const base = import.meta.env.VITE_API_BASE ?? "http://localhost:3000";
+  const wsBase = base.replace(/^http/, "ws");
+  const path = "/ws/transcribe";
+  return token
+    ? `${wsBase}${path}?token=${encodeURIComponent(token)}`
+    : `${wsBase}${path}`;
+}
+
+/** Provider and optional ephemeral secret for realtime transcription (voice input). */
 export async function getRealtimeClientSecret(model?: string): Promise<{
-  value: string;
+  provider: string;
+  value?: string;
 }> {
   const res = await authFetch(`${BASE}/api/realtime/client-secret`, {
     method: "POST",
@@ -142,7 +153,7 @@ export async function getRealtimeClientSecret(model?: string): Promise<{
   });
   const body = await res.text();
   if (!res.ok) throw new Error(apiError(res, body));
-  return JSON.parse(body) as { value: string };
+  return JSON.parse(body) as { provider: string; value?: string };
 }
 
 /** POST /api/chat returns 202 with eventId; the actual reply is delivered via Socket.IO (use waitForChatResult in socket.ts). */
@@ -325,7 +336,8 @@ export interface AppConfig {
   TRANSCRIPTION_MODEL: string;
   AGENT_NAME: string;
   AGENT_INSTRUCTIONS: string;
-  AZURE_RESOURCE_NAME?: string;
+  AZURE_CHAT_RESOURCE_NAME?: string;
+  AZURE_TRANSCRIPTION_RESOURCE_NAME?: string;
   AZURE_API_KEY?: string;
   AZURE_API_VERSION?: string;
   DEEPGRAM_API_KEY?: string;

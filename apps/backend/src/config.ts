@@ -45,8 +45,10 @@ export interface PersistedConfig {
   TRANSCRIPTION_MODEL: string;
   AGENT_NAME: string;
   AGENT_INSTRUCTIONS: string;
-  /** Azure OpenAI */
-  AZURE_RESOURCE_NAME: string;
+  /** Azure OpenAI (chat) */
+  AZURE_CHAT_RESOURCE_NAME: string;
+  /** Azure OpenAI (transcription) */
+  AZURE_TRANSCRIPTION_RESOURCE_NAME: string;
   AZURE_API_KEY: string;
   AZURE_API_VERSION: string;
   /** Deepgram (when TRANSCRIPTION_PROVIDER === 'deepgram'). */
@@ -91,7 +93,8 @@ const DEFAULTS: PersistedConfig = {
   TRANSCRIPTION_MODEL: "gpt-4o-transcribe",
   AGENT_NAME: "Hooman",
   AGENT_INSTRUCTIONS: getDefaultAgentInstructions(),
-  AZURE_RESOURCE_NAME: "",
+  AZURE_CHAT_RESOURCE_NAME: "",
+  AZURE_TRANSCRIPTION_RESOURCE_NAME: "",
   AZURE_API_KEY: "",
   AZURE_API_VERSION: "",
   DEEPGRAM_API_KEY: "",
@@ -173,8 +176,12 @@ export function updateConfig(patch: Partial<PersistedConfig>): PersistedConfig {
   if (patch.AGENT_INSTRUCTIONS !== undefined)
     store.AGENT_INSTRUCTIONS =
       String(patch.AGENT_INSTRUCTIONS).trim() || getDefaultAgentInstructions();
-  if (patch.AZURE_RESOURCE_NAME !== undefined)
-    store.AZURE_RESOURCE_NAME = String(patch.AZURE_RESOURCE_NAME);
+  if (patch.AZURE_CHAT_RESOURCE_NAME !== undefined)
+    store.AZURE_CHAT_RESOURCE_NAME = String(patch.AZURE_CHAT_RESOURCE_NAME);
+  if (patch.AZURE_TRANSCRIPTION_RESOURCE_NAME !== undefined)
+    store.AZURE_TRANSCRIPTION_RESOURCE_NAME = String(
+      patch.AZURE_TRANSCRIPTION_RESOURCE_NAME,
+    );
   if (patch.AZURE_API_KEY !== undefined)
     store.AZURE_API_KEY = String(patch.AZURE_API_KEY);
   if (patch.AZURE_API_VERSION !== undefined)
@@ -280,8 +287,14 @@ export async function loadPersisted(): Promise<void> {
         isTranscriptionProviderId(parsed.TRANSCRIPTION_PROVIDER)
       )
         store.TRANSCRIPTION_PROVIDER = parsed.TRANSCRIPTION_PROVIDER;
-      if (parsed.AZURE_RESOURCE_NAME !== undefined)
-        store.AZURE_RESOURCE_NAME = String(parsed.AZURE_RESOURCE_NAME);
+      if (parsed.AZURE_CHAT_RESOURCE_NAME !== undefined)
+        store.AZURE_CHAT_RESOURCE_NAME = String(
+          parsed.AZURE_CHAT_RESOURCE_NAME,
+        );
+      if (parsed.AZURE_TRANSCRIPTION_RESOURCE_NAME !== undefined)
+        store.AZURE_TRANSCRIPTION_RESOURCE_NAME = String(
+          parsed.AZURE_TRANSCRIPTION_RESOURCE_NAME,
+        );
       if (parsed.AZURE_API_KEY !== undefined)
         store.AZURE_API_KEY = String(parsed.AZURE_API_KEY);
       if (parsed.AZURE_API_VERSION !== undefined)

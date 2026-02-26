@@ -1,5 +1,4 @@
 import type { Express, Request, Response } from "express";
-import createDebug from "debug";
 import type { AppContext } from "../utils/helpers.js";
 import type { LLMProviderId, TranscriptionProviderId } from "../config.js";
 import { getConfig, updateConfig } from "../config.js";
@@ -8,8 +7,7 @@ import {
   getKillSwitchEnabled,
   setKillSwitchEnabled,
 } from "../agents/kill-switch.js";
-
-const debug = createDebug("hooman:routes:settings");
+import { getRealtimeClientSecret } from "../chats/realtime-service.js";
 
 export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
   app.get("/api/config", (_req: Request, res: Response) => {
@@ -23,7 +21,8 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
       TRANSCRIPTION_MODEL: c.TRANSCRIPTION_MODEL,
       AGENT_NAME: c.AGENT_NAME,
       AGENT_INSTRUCTIONS: c.AGENT_INSTRUCTIONS,
-      AZURE_RESOURCE_NAME: c.AZURE_RESOURCE_NAME,
+      AZURE_CHAT_RESOURCE_NAME: c.AZURE_CHAT_RESOURCE_NAME,
+      AZURE_TRANSCRIPTION_RESOURCE_NAME: c.AZURE_TRANSCRIPTION_RESOURCE_NAME,
       AZURE_API_KEY: c.AZURE_API_KEY,
       AZURE_API_VERSION: c.AZURE_API_VERSION,
       DEEPGRAM_API_KEY: c.DEEPGRAM_API_KEY,
@@ -59,11 +58,14 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
           | undefined,
         OPENAI_API_KEY: patch.OPENAI_API_KEY as string | undefined,
         CHAT_MODEL: patch.CHAT_MODEL as string | undefined,
-
         TRANSCRIPTION_MODEL: patch.TRANSCRIPTION_MODEL as string | undefined,
         AGENT_NAME: patch.AGENT_NAME as string | undefined,
         AGENT_INSTRUCTIONS: patch.AGENT_INSTRUCTIONS as string | undefined,
-        AZURE_RESOURCE_NAME: patch.AZURE_RESOURCE_NAME as string | undefined,
+        AZURE_CHAT_RESOURCE_NAME: patch.AZURE_CHAT_RESOURCE_NAME as
+          | string
+          | undefined,
+        AZURE_TRANSCRIPTION_RESOURCE_NAME:
+          patch.AZURE_TRANSCRIPTION_RESOURCE_NAME as string | undefined,
         AZURE_API_KEY: patch.AZURE_API_KEY as string | undefined,
         AZURE_API_VERSION: patch.AZURE_API_VERSION as string | undefined,
         DEEPGRAM_API_KEY: patch.DEEPGRAM_API_KEY as string | undefined,
@@ -101,65 +103,15 @@ export function registerSettingsRoutes(app: Express, _ctx: AppContext): void {
     "/api/realtime/client-secret",
     async (req: Request, res: Response) => {
       const config = getConfig();
-      const apiKey = config.OPENAI_API_KEY?.trim();
-      if (!apiKey) {
-        res.status(400).json({
-          error: "OPENAI_API_KEY not configured. Set it in Settings.",
-        });
+      const result = await getRealtimeClientSecret(
+        config,
+        req.body as { model?: string } | undefined,
+      );
+      if ("error" in result) {
+        res.status(result.status).json({ error: result.error });
         return;
       }
-      const model =
-        (req.body as { model?: string })?.model ?? config.TRANSCRIPTION_MODEL;
-      try {
-        const response = await fetch(
-          "https://api.openai.com/v1/realtime/client_secrets",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              expires_after: { anchor: "created_at", seconds: 300 },
-              session: {
-                type: "transcription",
-                audio: {
-                  input: {
-                    format: { type: "audio/pcm", rate: 24000 },
-                    noise_reduction: { type: "near_field" },
-                    transcription: {
-                      model: model || "gpt-4o-transcribe",
-                      prompt: "",
-                      language: "en",
-                    },
-                    turn_detection: {
-                      type: "server_vad",
-                      threshold: 0.5,
-                      prefix_padding_ms: 300,
-                      silence_duration_ms: 500,
-                    },
-                  },
-                },
-              },
-            }),
-          },
-        );
-        if (!response.ok) {
-          const err = await response.text();
-          debug("realtime client_secrets error: %s", err);
-          res
-            .status(response.status)
-            .json({ error: err || "Failed to create client secret." });
-          return;
-        }
-        const data = (await response.json()) as { value: string };
-        res.json({ value: data.value });
-      } catch (err) {
-        debug("realtime client-secret error: %o", err);
-        res
-          .status(500)
-          .json({ error: "Failed to create transcription session." });
-      }
+      res.json(result);
     },
   );
 

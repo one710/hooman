@@ -107,6 +107,9 @@ components:
           items:
             type: string
           description: Optional array of attachment IDs from a prior upload.
+        userId:
+          type: string
+          description: User or correlation id; default "default".
 
     SendMessageResponse:
       type: object
@@ -162,7 +165,9 @@ components:
           type: string
         AGENT_INSTRUCTIONS:
           type: string
-        AZURE_RESOURCE_NAME:
+        AZURE_CHAT_RESOURCE_NAME:
+          type: string
+        AZURE_TRANSCRIPTION_RESOURCE_NAME:
           type: string
         AZURE_API_KEY:
           type: string
@@ -200,6 +205,9 @@ components:
         CHAT_TIMEOUT_MS:
           type: integer
           description: Chat timeout in ms. 0 or unset = 300 000 (5 min).
+        MAX_TURNS:
+          type: integer
+          description: Max agent turns per run. Unset or 0 = 999.
 
     # ── Channels ──────────────────────────────────────────────────────────
     ChannelEntry:
@@ -473,6 +481,41 @@ components:
           type: string
           description: Ephemeral client secret for OpenAI Realtime API.
 
+    RealtimeClientSecretSuccess:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          enum: [openai, azure, deepgram]
+          description: Configured transcription provider.
+        value:
+          type: string
+          description: Ephemeral client secret; only present when provider is openai.
+
+    MCPToolsResponse:
+      type: object
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          items: {}
+          description: Discovered MCP tool descriptors from connected servers.
+
+    ServiceStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        latencyMs:
+          type: integer
+          description: Response latency in milliseconds.
+        error:
+          type: string
+          description: Error message when status is error.
+
     # ── Common Error ──────────────────────────────────────────────────────
     ErrorResponse:
       type: object
@@ -494,23 +537,57 @@ paths:
     get:
       operationId: getHealth
       summary: Health check
-      description: Returns server health status and kill‑switch state. No auth required.
+      description: Returns server health status, kill‑switch state, and dependency checks. No auth required.
       tags: [Health]
       security: []
       responses:
         "200":
-          description: Server is healthy.
+          description: Server and all dependencies healthy.
           content:
             application/json:
               schema:
                 type: object
-                required: [status]
+                required: [status, killSwitch, services]
                 properties:
                   status:
                     type: string
+                    enum: [ok, degraded]
                     example: ok
                   killSwitch:
                     type: boolean
+                  services:
+                    type: object
+                    required: [redis, chroma, eventQueue]
+                    properties:
+                      redis:
+                        $ref: "#/components/schemas/ServiceStatus"
+                      chroma:
+                        $ref: "#/components/schemas/ServiceStatus"
+                      eventQueue:
+                        $ref: "#/components/schemas/ServiceStatus"
+        "503":
+          description: One or more dependencies unhealthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, killSwitch, services]
+                properties:
+                  status:
+                    type: string
+                    enum: [degraded]
+                  killSwitch:
+                    type: boolean
+                  services:
+                    type: object
+                    required: [redis, chroma, eventQueue]
+                    properties:
+                      redis:
+                        $ref: "#/components/schemas/ServiceStatus"
+                      chroma:
+                        $ref: "#/components/schemas/ServiceStatus"
+                      eventQueue:
+                        $ref: "#/components/schemas/ServiceStatus"
 
   # ╔══════════════════════════════════════════════════════════════════════╗
   # ║  Auth                                                               ║
@@ -607,6 +684,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/chat/stream:
+    get:
+      operationId: getChatStream
+      summary: Server-sent events stream for audit responses
+      description: |
+        Returns a stream with `Content-Type: text/event-stream`. Emits
+        `data: {"type":"response","text":"..."}` when the audit log receives
+        an assistant response. Client can use this for live updates.
+      tags: [Chat]
+      responses:
+        "200":
+          description: SSE stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Newline-delimited SSE messages; each data line is JSON.
+
   /api/chat/history:
     get:
       operationId: getChatHistory
@@ -631,6 +726,12 @@ paths:
             minimum: 1
             maximum: 200
           description: Number of messages per page.
+        - name: userId
+          in: query
+          schema:
+            type: string
+            default: "default"
+          description: User or correlation id.
       responses:
         "200":
           description: Chat history page.
@@ -643,6 +744,13 @@ paths:
       operationId: clearChatHistory
       summary: Clear all chat history
       tags: [Chat]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+            default: "default"
+          description: User or correlation id.
       responses:
         "200":
           description: History cleared.
@@ -666,6 +774,13 @@ paths:
         The returned IDs can be passed to `POST /api/chat` in the
         `attachments` array.
       tags: [Chat]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+            default: "default"
+          description: User or correlation id.
       requestBody:
         required: true
         content:
@@ -735,12 +850,13 @@ paths:
   /api/realtime/client-secret:
     post:
       operationId: getRealtimeClientSecret
-      summary: Obtain ephemeral OpenAI Realtime API client secret
+      summary: Obtain realtime transcription session info
       description: |
-        Proxies a request to OpenAI's `/v1/realtime/client_secrets` endpoint
-        to create a short-lived (5 min) client secret for browser-side
-        transcription via WebRTC. Falls back to the server's configured
-        `TRANSCRIPTION_MODEL` if no model override is provided.
+        Behavior depends on the configured transcription provider. For **OpenAI**,
+        returns an ephemeral (5 min) client secret for browser-side transcription
+        via WebRTC; optional model override in body. For **Azure** or **Deepgram**,
+        returns provider identification only (no secret); client connects to
+        backend WebSocket for transcription.
       tags: [Realtime]
       requestBody:
         required: false
@@ -750,11 +866,11 @@ paths:
               $ref: "#/components/schemas/ClientSecretRequest"
       responses:
         "200":
-          description: Client secret created.
+          description: Session info; value only present when provider is openai.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ClientSecretResponse"
+                $ref: "#/components/schemas/RealtimeClientSecretSuccess"
         "400":
           description: OPENAI_API_KEY not configured.
           content:
@@ -1087,6 +1203,46 @@ paths:
   # ╔══════════════════════════════════════════════════════════════════════╗
   # ║  Capabilities / MCP                                                 ║
   # ╚══════════════════════════════════════════════════════════════════════╝
+
+  /api/capabilities/mcp/tools:
+    get:
+      operationId: getMCPTools
+      summary: List discovered MCP tools
+      description: Returns the current list of tools from all connected MCP servers (read from Redis).
+      tags: [Capabilities]
+      responses:
+        "200":
+          description: Discovered tools.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPToolsResponse"
+        "500":
+          description: Server error (e.g. Redis unavailable).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/capabilities/mcp/reload:
+    post:
+      operationId: reloadMCP
+      summary: Reload MCP connections and tools
+      description: Triggers a full MCP reload via the event queue; returns the updated list of discovered tools.
+      tags: [Capabilities]
+      responses:
+        "200":
+          description: Reload completed; returns current tools.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MCPToolsResponse"
+        "500":
+          description: Reload or Redis error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/capabilities/mcp/connections:
     get:

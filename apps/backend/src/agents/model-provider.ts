@@ -23,11 +23,11 @@ export function getHoomanModel(config: AppConfig) {
       })(modelId);
     }
     case "azure": {
-      const resourceName = (config.AZURE_RESOURCE_NAME ?? "").trim();
+      const resourceName = (config.AZURE_CHAT_RESOURCE_NAME ?? "").trim();
       const apiKey = (config.AZURE_API_KEY ?? "").trim();
       if (!resourceName || !apiKey) {
         throw new Error(
-          "Azure provider requires AZURE_RESOURCE_NAME and AZURE_API_KEY. Set them in Settings.",
+          "Azure provider requires Azure chat resource name and API key. Set them in Settings.",
         );
       }
       return createAzure({
