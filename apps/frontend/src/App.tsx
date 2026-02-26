@@ -14,13 +14,13 @@ function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-hooman-bg text-zinc-200 overflow-hidden">
+    <div className="flex h-screen app-bg text-zinc-200 overflow-hidden">
       {sidebarOpen && (
         <button
           type="button"
           aria-label="Close menu"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden transition-opacity"
         />
       )}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />

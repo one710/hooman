@@ -49,12 +49,19 @@ const PUBLIC_PATHS = new Set([
   "/api/capabilities/mcp/oauth/callback",
 ]);
 
+/** Path prefixes that skip JWT (for signed attachment view URLs). */
+const PUBLIC_PATH_PREFIXES = ["/api/chat/attachments/view/"];
+
 /**
  * Requires valid JWT for all requests except PUBLIC_PATHS and completion routes.
  * Only mount this middleware when web auth is enabled.
  */
 export function authJwt(req: Request, res: Response, next: NextFunction): void {
-  if (PUBLIC_PATHS.has(req.path) || COMPLETION_ROUTES.has(req.path)) {
+  if (
+    PUBLIC_PATHS.has(req.path) ||
+    COMPLETION_ROUTES.has(req.path) ||
+    PUBLIC_PATH_PREFIXES.some((p) => req.path.startsWith(p))
+  ) {
     next();
     return;
   }

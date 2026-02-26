@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import createDebug from "debug";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2, MessageCircle, Zap } from "lucide-react";
 import type { ChatMessage as ChatMessageType } from "../types";
 import {
   sendMessage,
@@ -211,12 +211,19 @@ export function Chat() {
           </div>
         )}
         {messages.length === 0 && (
-          <div className="text-center text-hooman-muted py-12">
-            <p className="text-lg">
+          <div className="flex flex-col items-center justify-center text-center py-16 px-4 animate-fade-in">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-accent-subtle border border-hooman-accent/20 flex items-center justify-center mb-6 shadow-card">
+              <MessageCircle
+                className="w-10 h-10 text-hooman-accent"
+                aria-hidden
+              />
+            </div>
+            <p className="text-lg font-medium text-zinc-200 max-w-sm">
               Say hello. Ask what I can do, or tell me what to remember.
             </p>
-            <p className="text-sm mt-2">
-              I can converse, store memory, and draft content—no setup needed.
+            <p className="text-sm text-hooman-muted mt-2 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-hooman-amber" />I can converse, store
+              memory, and draft content—no setup needed.
             </p>
           </div>
         )}
@@ -224,9 +231,12 @@ export function Chat() {
           <ChatMessage key={i} message={m} />
         ))}
         {loading && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-2 bg-hooman-surface border border-hooman-border rounded-2xl px-4 py-2.5 text-hooman-muted text-sm">
-              <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden />
+          <div className="flex justify-start animate-fade-in">
+            <div className="flex items-center gap-2.5 bg-hooman-surface border border-hooman-border rounded-2xl px-4 py-3 text-hooman-muted text-sm shadow-card">
+              <Loader2
+                className="w-4 h-4 shrink-0 animate-spin text-hooman-accent"
+                aria-hidden
+              />
               <span>Thinking…</span>
             </div>
           </div>

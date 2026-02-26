@@ -55,36 +55,48 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
   return (
     <aside
       className={`
-        w-56 md:w-56 flex flex-col border-r border-hooman-border bg-hooman-surface
+        w-60 md:w-60 flex flex-col border-r border-hooman-border/80 bg-hooman-surface/80 backdrop-blur-xl
         fixed md:static inset-y-0 left-0 z-40
-        transform transition-transform duration-200 ease-out
+        transform transition-transform duration-300 ease-out
+        shadow-card md:shadow-none
         ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}
     >
-      <div className="px-4 md:px-6 py-3 md:py-4 border-b border-hooman-border flex items-center justify-between">
+      <div className="px-4 md:px-5 py-4 border-b border-hooman-border/80 flex items-center justify-between">
         <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base md:text-lg font-semibold text-white truncate">
-              Hooman
-            </h1>
-            <HealthBlip />
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.svg"
+              alt=""
+              className="w-9 h-9 rounded-xl shrink-0 object-contain"
+              width={36}
+              height={36}
+            />
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base md:text-lg font-semibold text-white truncate font-display">
+                  Hooman
+                </h1>
+                <HealthBlip />
+              </div>
+              <p className="text-xs md:text-sm text-hooman-muted truncate mt-0.5">
+                Your virtual identity
+              </p>
+            </div>
           </div>
-          <p className="text-xs md:text-sm text-hooman-muted truncate">
-            Your virtual identity
-          </p>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="md:hidden p-2 -mr-2 rounded-lg text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
+            className="md:hidden p-2 -mr-2 rounded-xl text-hooman-muted hover:bg-hooman-surface-hover hover:text-zinc-200 transition-colors"
             aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
-      <nav className="flex-1 p-2 overflow-y-auto">
+      <nav className="flex-1 p-2.5 overflow-y-auto flex flex-col gap-0.5">
         {nav.map((item) => {
           const Icon = item.Icon;
           return (
@@ -94,10 +106,10 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
               end={item.path === "/"}
               onClick={onClose}
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
+                `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-hooman-accent/20 text-hooman-accent"
-                    : "text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200"
+                    ? "bg-gradient-accent-subtle text-hooman-accent-bright shadow-inner border border-hooman-accent/20"
+                    : "text-hooman-muted hover:bg-hooman-surface-hover hover:text-zinc-200 border border-transparent"
                 }`
               }
             >
@@ -106,11 +118,11 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
             </NavLink>
           );
         })}
-        <div className="mt-2 pt-2 border-t border-hooman-border">
+        <div className="mt-[10px] pt-3 border-t border-hooman-border/80 shrink-0">
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-zinc-400 hover:bg-hooman-border/50 hover:text-zinc-200 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-hooman-muted hover:bg-hooman-surface-hover hover:text-hooman-coral transition-colors duration-200 border border-transparent"
           >
             <LogOut className="w-4 h-4 shrink-0" aria-hidden />
             Log out

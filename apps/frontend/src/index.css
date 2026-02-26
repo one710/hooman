@@ -2,14 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --hooman-bg: #0a0a0f;
+  --hooman-surface: #14141f;
+  --hooman-accent: #a78bfa;
+  --hooman-accent-glow: rgba(167, 139, 250, 0.4);
+  --hooman-cyan: #22d3ee;
+  --hooman-coral: #fb7185;
+}
+
 body {
   margin: 0;
-  font-family: "DM Sans", system-ui, sans-serif;
-  background: #0f0f12;
+  font-family: "Outfit", "DM Sans", system-ui, sans-serif;
+  background: var(--hooman-bg);
   color: #e4e4e7;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Subtle gradient mesh overlay on app background */
+.app-bg {
+  background-color: var(--hooman-bg);
+  background-image:
+    radial-gradient(
+      ellipse 80% 50% at 30% 0%,
+      rgba(167, 139, 250, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 70% 100%,
+      rgba(34, 211, 238, 0.06) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 50% 30% at 0% 50%,
+      rgba(251, 113, 133, 0.04) 0%,
+      transparent 50%
+    );
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  @apply outline-none ring-2 ring-hooman-accent/60 ring-offset-2 ring-offset-hooman-bg;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prose overrides for chat markdown */
+.prose-invert a {
+  @apply text-hooman-accent-bright hover:text-hooman-cyan transition-colors;
+}
+
+.prose-invert code {
+  @apply bg-hooman-border/60 text-hooman-cyan;
 }

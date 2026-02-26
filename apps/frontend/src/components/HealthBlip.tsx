@@ -44,16 +44,16 @@ export function HealthBlip() {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = () => {
+  const getStatusStyles = () => {
     switch (status) {
       case "ok":
-        return "bg-emerald-500";
+        return "bg-hooman-green shadow-[0_0_12px_-2px_rgba(52,211,153,0.5)]";
       case "degraded":
-        return "bg-amber-500";
+        return "bg-hooman-amber";
       case "unreachable":
-        return "bg-rose-500";
+        return "bg-hooman-red";
       default:
-        return "bg-zinc-500";
+        return "bg-hooman-muted animate-pulse";
     }
   };
 
@@ -74,14 +74,14 @@ export function HealthBlip() {
     <>
       <div className="font-medium">{getStatusLabel()}</div>
       {status === "degraded" && serviceErrors.length > 0 && (
-        <div className="mt-1 text-amber-300 text-left max-w-[220px]">
+        <div className="mt-1 text-hooman-amber text-left max-w-[220px]">
           {serviceErrors.map((line) => (
             <div key={line}>{line}</div>
           ))}
         </div>
       )}
       {latency !== null && (
-        <div className="text-zinc-400 mt-0.5">Latency: {latency}ms</div>
+        <div className="text-hooman-muted mt-0.5">Latency: {latency}ms</div>
       )}
     </>
   );
@@ -89,15 +89,15 @@ export function HealthBlip() {
   return (
     <div className="relative group flex items-center">
       <div
-        className={`w-2 h-2 rounded-full ${getStatusColor()} transition-colors duration-500 relative`}
+        className={`w-2.5 h-2.5 rounded-full ${getStatusStyles()} transition-all duration-500 relative`}
         aria-hidden="true"
       >
         {status === "ok" && (
-          <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75"></div>
+          <div className="absolute inset-0 rounded-full bg-hooman-green animate-ping opacity-60" />
         )}
       </div>
 
-      <div className="invisible group-hover:visible absolute left-full ml-2 px-2 py-1.5 bg-hooman-surface border border-hooman-border rounded text-[10px] text-white z-50 shadow-xl min-w-[140px] max-w-[240px]">
+      <div className="invisible group-hover:visible absolute left-full ml-2 px-2.5 py-2 bg-hooman-surface/95 backdrop-blur-xl border border-hooman-border rounded-xl text-[10px] text-white z-50 shadow-card min-w-[140px] max-w-[240px]">
         {tooltipBody}
       </div>
     </div>

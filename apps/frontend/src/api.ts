@@ -131,6 +131,30 @@ export function getAttachmentUrl(id: string): string {
   return `${BASE}/api/chat/attachments/${encodeURIComponent(id)}`;
 }
 
+/** Get signed URLs for attachments (usable in <img> and links; no auth needed when opening in new tab). */
+export async function getAttachmentSignedUrls(
+  ids: string[],
+): Promise<{ id: string; url: string }[]> {
+  if (ids.length === 0) return [];
+  const res = await authFetch(`${BASE}/api/chat/attachments/sign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attachmentIds: ids }),
+  });
+  const text = await res.text();
+  if (!res.ok) return [];
+  try {
+    const data = JSON.parse(text) as { urls?: { id: string; url: string }[] };
+    const list = Array.isArray(data.urls) ? data.urls : [];
+    return list.map(({ id, url }) => ({
+      id,
+      url: url.startsWith("/") ? `${BASE}${url}` : url,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** WebSocket URL for Deepgram live transcription proxy (voice input when provider is deepgram). */
 export function getRealtimeWsUrl(token: string | null): string {
   const base = import.meta.env.VITE_API_BASE ?? "http://localhost:3000";

@@ -1,27 +1,27 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 const base =
-  "rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+  "rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-hooman-bg disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-all duration-200 active:scale-[0.98]";
 
 const variants = {
   primary:
-    "bg-hooman-accent text-white hover:opacity-90 focus:ring-hooman-accent/50 focus:ring-offset-hooman-bg",
+    "bg-gradient-accent text-white shadow-glow-accent hover:opacity-95 hover:shadow-glow-lg hover:shadow-hooman-accent-glow focus:ring-hooman-accent/50",
   secondary:
-    "border border-hooman-border bg-hooman-surface text-hooman-muted hover:bg-hooman-border/30 focus:ring-hooman-accent/50 focus:ring-offset-hooman-surface",
+    "border border-hooman-border bg-hooman-surface text-hooman-muted hover:bg-hooman-surface-hover hover:text-zinc-200 hover:border-hooman-border-focus focus:ring-hooman-accent/50",
   success:
-    "border border-hooman-border bg-hooman-surface text-green-400 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30 focus:ring-green-500/50 focus:ring-offset-hooman-surface",
+    "border border-hooman-green/40 bg-hooman-surface text-hooman-green hover:bg-hooman-green/10 hover:shadow-glow-green focus:ring-hooman-green/50",
   danger:
-    "border border-hooman-border bg-hooman-surface text-red-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 focus:ring-red-500/50 focus:ring-offset-hooman-surface",
+    "border border-hooman-red/40 bg-hooman-surface text-hooman-red hover:bg-hooman-red/10 hover:shadow-glow-red focus:ring-hooman-red/50",
   dangerFilled:
-    "bg-hooman-red text-white hover:opacity-90 focus:ring-hooman-red/50 focus:ring-offset-hooman-bg",
+    "bg-hooman-red text-white shadow-glow-red hover:opacity-95 focus:ring-hooman-red/50",
   ghost:
-    "text-hooman-muted hover:text-hooman-accent focus:ring-hooman-accent/50 focus:ring-offset-hooman-bg",
+    "text-hooman-muted hover:text-hooman-accent hover:bg-hooman-surface-hover focus:ring-hooman-accent/50",
 } as const;
 
 const sizes = {
-  sm: "px-2.5 md:px-3 py-1.5 md:py-2 text-xs md:text-sm",
-  md: "px-4 py-2 text-sm",
-  icon: "p-2 inline-flex items-center justify-center",
+  sm: "px-3 md:px-3.5 py-1.5 md:py-2 text-xs md:text-sm",
+  md: "px-4 py-2.5 text-sm",
+  icon: "p-2.5 inline-flex items-center justify-center",
 } as const;
 
 export type ButtonVariant = keyof typeof variants;
@@ -55,7 +55,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-1.5 ${base} ${variantClass} ${sizeClass} ${className}`.trim()}
+      className={`inline-flex items-center justify-center gap-2 ${base} ${variantClass} ${sizeClass} ${className}`.trim()}
       {...rest}
     >
       {icon != null && (

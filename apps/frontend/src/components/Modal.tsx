@@ -42,7 +42,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -50,11 +50,14 @@ export function Modal({
     >
       <div
         ref={contentRef}
-        className={`flex max-h-[90vh] flex-col rounded-xl border border-hooman-border bg-hooman-surface shadow-xl w-full overflow-hidden ${maxWidthClasses[maxWidth]}`}
+        className={`flex max-h-[90vh] flex-col rounded-2xl border border-hooman-border/80 bg-hooman-surface/95 backdrop-blur-xl shadow-card w-full overflow-hidden animate-fade-in-up ${maxWidthClasses[maxWidth]}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 px-5 pt-5 pb-2 border-b border-hooman-border">
-          <h2 id="modal-title" className="text-lg font-semibold text-white">
+        <div className="shrink-0 px-5 pt-5 pb-2 border-b border-hooman-border/80">
+          <h2
+            id="modal-title"
+            className="text-lg font-semibold text-white font-display"
+          >
             {title}
           </h2>
         </div>
@@ -62,7 +65,7 @@ export function Modal({
           {children}
         </div>
         {footer != null && (
-          <div className="shrink-0 border-t border-hooman-border px-5 py-3">
+          <div className="shrink-0 border-t border-hooman-border/80 px-5 py-3">
             {footer}
           </div>
         )}

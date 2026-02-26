@@ -6,6 +6,7 @@ import {
   FileText,
   Plus,
   ListOrdered,
+  Send,
 } from "lucide-react";
 import {
   uploadAttachments,
@@ -143,12 +144,18 @@ export function ChatInput({
     if (list.length === 0) return;
     setAttachments((prev) => {
       const space = MAX_ATTACHMENTS - prev.length;
-      const toAdd = list.slice(0, space).map((file) => ({
-        id: `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        originalName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        uploading: true as const,
-      }));
+      const toAdd = list.slice(0, space).map((file) => {
+        const mimeType = file.type || "application/octet-stream";
+        return {
+          id: `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          originalName: file.name,
+          mimeType,
+          uploading: true as const,
+          preview: isImageMime(mimeType)
+            ? URL.createObjectURL(file)
+            : undefined,
+        };
+      });
       return [...prev, ...toAdd];
     });
     (async () => {
@@ -157,27 +164,40 @@ export function ChatInput({
           await uploadAttachments(list);
         setAttachments((prev) => {
           const withoutUploading = prev.filter((a) => !a.uploading);
+          const uploadingPrev = prev.filter((a) => a.uploading);
           const uploaded = serverAttachments.map(
-            (a: ChatAttachmentMeta) =>
+            (a: ChatAttachmentMeta, i: number) =>
               ({
                 id: a.id,
                 originalName: a.originalName,
                 mimeType: a.mimeType,
                 preview: isImageMime(a.mimeType)
-                  ? getAttachmentUrl(a.id)
+                  ? (uploadingPrev[i]?.preview ?? getAttachmentUrl(a.id))
                   : undefined,
               }) as PendingAttachment,
           );
           return [...withoutUploading, ...uploaded];
         });
       } catch {
-        setAttachments((prev) => prev.filter((a) => !a.uploading));
+        setAttachments((prev) => {
+          prev
+            .filter((a) => a.uploading)
+            .forEach((a) => {
+              if (a.preview?.startsWith("blob:"))
+                URL.revokeObjectURL(a.preview);
+            });
+          return prev.filter((a) => !a.uploading);
+        });
       }
     })();
   }, []);
 
   const removeAttachment = useCallback((id: string) => {
-    setAttachments((prev) => prev.filter((x) => x.id !== id));
+    setAttachments((prev) => {
+      const item = prev.find((x) => x.id === id);
+      if (item?.preview?.startsWith("blob:")) URL.revokeObjectURL(item.preview);
+      return prev.filter((x) => x.id !== id);
+    });
   }, []);
 
   function handleSubmit(e: React.FormEvent) {
@@ -190,6 +210,9 @@ export function ChatInput({
     const messageText = text || "(attachments)";
     setInput("");
     clearChatDraft();
+    attachments.forEach((a) => {
+      if (a.preview?.startsWith("blob:")) URL.revokeObjectURL(a.preview);
+    });
     const attachmentIds = ready.length ? ready.map((a) => a.id) : undefined;
     const attachmentMetas = ready.length
       ? ready.map((a) => ({
@@ -220,10 +243,10 @@ export function ChatInput({
         e.currentTarget.classList.remove("ring-2", "ring-hooman-accent/50");
         if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
       }}
-      className="p-3 md:p-4 border-t border-hooman-border shrink-0 rounded-lg transition-shadow"
+      className="p-3 md:p-4 border-t border-hooman-border/80 shrink-0 bg-hooman-bg-elevated/50 backdrop-blur-sm transition-shadow"
     >
       {voice.error && (
-        <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
+        <div className="mb-3 rounded-xl bg-hooman-red/10 border border-hooman-red/30 px-3 py-2 text-sm text-hooman-red">
           {voice.error}
         </div>
       )}
@@ -238,10 +261,10 @@ export function ChatInput({
       {attachments.length > 0 && (
         <div className="mb-3 pb-3 border-b border-hooman-border/50">
           <p className="flex items-center gap-2 text-xs text-hooman-muted mb-2">
-            <Paperclip className="w-3.5 h-3.5" />
+            <Paperclip className="w-3.5 h-3.5 text-hooman-accent" />
             {attachments.length} attached
             {attachments.some((a) => a.uploading) && (
-              <span className="flex items-center gap-1.5 text-hooman-accent">
+              <span className="flex items-center gap-1.5 text-hooman-cyan">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
                 Uploading…
               </span>
@@ -251,7 +274,7 @@ export function ChatInput({
             {attachments.map((a) => (
               <li
                 key={a.id}
-                className="flex items-center gap-2 rounded-lg bg-hooman-surface border border-hooman-border overflow-hidden group"
+                className="flex items-center gap-2 rounded-xl bg-hooman-surface border border-hooman-border overflow-hidden group"
               >
                 {a.uploading ? (
                   <span className="w-12 h-12 flex items-center justify-center shrink-0 bg-hooman-border/50 text-hooman-muted">
@@ -280,7 +303,7 @@ export function ChatInput({
                   title="Remove attachment"
                   aria-label="Remove attachment"
                   disabled={a.uploading}
-                  className="shrink-0 p-1 opacity-70 hover:opacity-100"
+                  className="shrink-0 p-1 mr-2 opacity-70 hover:opacity-100"
                 />
               </li>
             ))}
@@ -290,14 +313,14 @@ export function ChatInput({
       {queue.length > 0 && (
         <div className="mb-3 pb-3 border-b border-hooman-border/50">
           <p className="flex items-center gap-2 text-xs text-hooman-muted mb-2">
-            <ListOrdered className="w-3.5 h-3.5" />
+            <ListOrdered className="w-3.5 h-3.5 text-hooman-amber" />
             {queue.length} queued
           </p>
           <ul className="space-y-1.5">
             {queue.map((item, i) => (
               <li
                 key={i}
-                className="flex items-center gap-2 rounded-lg bg-hooman-surface/80 border border-hooman-border px-3 py-2 text-sm text-zinc-300"
+                className="flex items-center gap-2 rounded-xl bg-hooman-surface/80 border border-hooman-border px-3 py-2 text-sm text-zinc-300"
               >
                 <span className="flex-1 truncate">
                   {item.text}
@@ -354,7 +377,7 @@ export function ChatInput({
               }
             }}
             placeholder="Type a message or drag & drop / paste files…"
-            className="w-full rounded-xl bg-hooman-surface border border-hooman-border pl-11 pr-11 md:pl-12 md:pr-12 py-2.5 md:py-3 text-sm md:text-base text-zinc-200 placeholder:text-hooman-muted focus:outline-none focus:ring-2 focus:ring-hooman-accent/50"
+            className="w-full rounded-xl bg-hooman-surface border border-hooman-border pl-11 pr-11 md:pl-12 md:pr-12 py-2.5 md:py-3 text-sm md:text-base text-zinc-200 placeholder:text-hooman-muted focus:outline-none focus:ring-2 focus:ring-hooman-accent/50 focus:border-hooman-accent/40 transition-all"
           />
           <button
             type="button"
@@ -362,7 +385,7 @@ export function ChatInput({
             title="Attach files"
             aria-label="Attach files"
             disabled={attachments.length >= MAX_ATTACHMENTS}
-            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center bg-hooman-surface text-hooman-muted hover:text-zinc-200 hover:bg-hooman-surface/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center bg-hooman-surface border border-transparent text-hooman-muted hover:text-hooman-accent hover:bg-hooman-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
           </button>
@@ -375,8 +398,9 @@ export function ChatInput({
         <button
           type="submit"
           disabled={!input.trim() && attachments.length === 0}
-          className="rounded-xl bg-hooman-accent px-4 md:px-5 py-2.5 md:py-3 text-sm md:text-base text-white font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="rounded-xl bg-gradient-accent px-4 md:px-5 py-2.5 md:py-3 text-sm md:text-base text-white font-medium shadow-glow-accent hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 inline-flex items-center gap-2 transition-all active:scale-[0.98]"
         >
+          <Send className="w-4 h-4 md:w-5 md:h-5 shrink-0" aria-hidden />
           Send
         </button>
       </div>

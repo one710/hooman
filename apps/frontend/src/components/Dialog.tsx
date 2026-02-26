@@ -113,18 +113,21 @@ function DialogBackdrop({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="dialog-title"
       onClick={onDismiss}
     >
       <div
-        className="rounded-xl border border-hooman-border bg-hooman-surface shadow-xl max-w-md w-full overflow-hidden"
+        className="rounded-2xl border border-hooman-border/80 bg-hooman-surface/95 backdrop-blur-xl shadow-card max-w-md w-full overflow-hidden animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-1">
-          <h2 id="dialog-title" className="text-lg font-semibold text-white">
+          <h2
+            id="dialog-title"
+            className="text-lg font-semibold text-white font-display"
+          >
             {dialog.type === "alert"
               ? (dialog.title ?? "Notice")
               : (dialog.title ?? "Confirm")}
